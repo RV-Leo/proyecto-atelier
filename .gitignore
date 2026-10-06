@@ -1,0 +1,49 @@
+# --- General ---
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+Thumbs.db
+
+# --- IDEs ---
+.idea/
+.vscode/
+*.iml
+
+# --- Spring Boot (backend) ---
+backend/target/
+backend/build/
+backend/.gradle/
+backend/HELP.md
+backend/src/main/resources/application-local.*
+
+# --- Django (web) ---
+web/venv/
+web/.venv/
+**/__pycache__/
+*.pyc
+web/db.sqlite3
+web/media/
+web/staticfiles/
+
+# --- Android / Kotlin (mobile) ---
+mobile/.gradle/
+mobile/build/
+mobile/app/build/
+mobile/local.properties
+mobile/.idea/
+mobile/captures/
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# --- IA (no subir modelos ni datasets pesados) ---
+*.safetensors
+*.ckpt
+*.gguf
+*.pt
+*.bin
+models/
+datasets/
