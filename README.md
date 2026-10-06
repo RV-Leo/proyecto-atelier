@@ -1,10 +1,10 @@
 <div align="center">
 
-# 🧵 Atelier
+<img src="docs/atelier-banner.svg" alt="Atelier" width="100%">
 
 ### Del hilo a la idea. De la idea a la prenda.
 
-*Diseña con IA, descubre tendencias y sabe si tu prenda se puede producir, todo en un solo lugar.*
+*Diseña prendas, explora tendencias y revisa si puedes producir tus ideas.*
 
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)
 ![Django](https://img.shields.io/badge/Django-092E20?style=for-the-badge&logo=django&logoColor=white)
@@ -15,60 +15,74 @@
 
 ---
 
-## ✨ ¿Qué es Atelier?
+## ¿Qué es Atelier?
 
-Atelier es un sistema para el **rubro textil** que une tres inteligencias artificiales en un solo flujo de trabajo:
+Atelier es un proyecto para el **rubro textil**. Reúne herramientas para crear diseños, consultar tendencias y revisar si una prenda se puede fabricar con los materiales disponibles.
 
-| | Módulo | ¿Qué hace? |
+| Módulo | ¿Para qué sirve? |
+|---|---|
+| **Diseño generativo** | Crear imágenes de prendas a partir de detalles como el tipo, el estilo, los colores y la tela. |
+| **Tendencias** | Consultar tendencias de Europa y América a partir de Pinterest y tiendas de marca. |
+| **Viabilidad e inventario** | Revisar si hay materiales para producir una prenda y buscar alternativas cuando falte stock. |
+
+## ¿Cómo funciona?
+
+```
+App móvil (Kotlin / Android) ──┐
+                               ├──> API REST (Spring Boot) ──> Gateway IA (Django) ──> Modelos Qwen
+Aplicación web (Django) ───────┘                │                 
+                                                v
+                                  Base de datos (PostgreSQL propuesto)
+```
+
+PostgreSQL es una propuesta para la base de datos; todavía no hay un motor configurado en el repositorio.
+
+## Modelos de IA
+
+Para las funciones de IA elegimos modelos de la familia **Qwen**. Se ejecutan en un servidor local y nos ayudan a crear diseños, revisar tendencias y comprobar si hay materiales para producir una prenda.
+
+| Módulo | Modelo | Uso |
 |---|---|---|
-| 🎨 | **Diseño generativo** | Crea imágenes de prendas a partir de una descripción: tipo, estilo, colores y tela. |
-| 📈 | **Tendencias** | Recopila lo que se lleva en Europa y América desde Pinterest y tiendas de marca. |
-| 🧪 | **Viabilidad e inventario** | Analiza si la prenda se puede producir con el stock disponible y propone alternativas. |
+| Diseño generativo | Qwen-Image / Qwen-Image-Edit | Crear y editar imágenes de prendas |
+| Tendencias | Qwen3.6-35B-A3B | Identificar colores, cortes y telas en imágenes |
+| Viabilidad e inventario | Qwen3.6-35B-A3B | Comparar una idea con el stock y sugerir alternativas |
 
-## 🧭 ¿Cómo funciona?
+En [`docs/modelos-ia.md`](docs/modelos-ia.md) contamos por qué elegimos estos modelos y qué papel cumplen en el proyecto.
 
-```
- 📱 App móvil ─┐
-               ├──▶ ⚙️ Spring Boot ──▶ 🌐 Django (gateway IA) ──▶ 🤖 Modelos en servidor
- 💻 Web ───────┘          │
-                          ▼
-                    🗄️ Base de datos
-```
-
-## 📁 Estructura del proyecto
+## Estructura del proyecto
 
 ```
 atelier/
-├── 📂 backend/   → API REST, seguridad y base de datos (Spring Boot)
-├── 📂 web/       → Aplicación web y conexión con la IA (Django)
-├── 📂 mobile/    → App Android (Kotlin)
-└── 📂 docs/      → Contrato de la API, diagramas e informes
+├── backend/   → API REST, seguridad y base de datos (Spring Boot)
+├── web/       → Aplicación web y conexión con la IA (Django)
+├── mobile/    → App Android (Kotlin)
+└── docs/      → Documentación del proyecto
 ```
 
-## 🚀 Empezar
+## Empezar
 
 1. Clona el repositorio:
 ```bash
    git clone https://github.com/RV-Leo/proyecto-atelier.git
 ```
-2. Entra a la carpeta del módulo que vas a trabajar y sigue su guía.
-3. Crea tu archivo `.env` a partir de `.env.example` *(nunca lo subas a GitHub)*.
+2. Entra en la carpeta del módulo en el que vas a trabajar y sigue las instrucciones de su guía.
+3. Crea un archivo `.env` a partir de `.env.example`. No subas tu `.env` a GitHub.
 
-## 🤝 Cómo colaboramos
+## Cómo colaboramos
 
-- 🌿 `main` es la rama estable; el trabajo diario va en `develop`.
-- 🔀 Cada tarea tiene su rama: `feature/web-...`, `feature/mobile-...`, `feature/backend-...`.
-- 💬 Commits con prefijo: `web:`, `mobile:`, `backend:`, `docs:`.
-- 🔒 Nada de claves ni contraseñas en el código.
+- Usamos `main` como rama estable y `develop` para el trabajo diario.
+- Para cada tarea, crea una rama con el prefijo correspondiente: `feature/web-...`, `feature/mobile-...` o `feature/backend-...`.
+- En los commits usamos estos prefijos: `web:`, `mobile:`, `backend:` y `docs:`.
 
-## 👥 Equipo
+## Equipo
 
 | Integrante | Rol |
 |---|---|
-| *Nombre* | *Rol* |
+| Leonardo Ronda | *Rol* |
+| Yamil Ochoa | *Rol* |
+| Antonella Quispe | *Rol* |
 
 <div align="center">
 
-Hecho con 🧵 y mucho ☕ en **Tecsup**
 
 </div>
