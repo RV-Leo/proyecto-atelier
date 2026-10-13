@@ -1,5 +1,6 @@
 """Pruebas del catálogo: modelos, vistas y filtros."""
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
@@ -80,7 +81,15 @@ class VistasTests(TestCase):
         respuesta = self.client.get(reverse('catalogo:detalle', args=['no-existe']))
         self.assertEqual(respuesta.status_code, 404)
 
-    def test_inventario_responde(self):
+    def test_inventario_requiere_sesion(self):
+        respuesta = self.client.get(reverse('catalogo:inventario'))
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertIn(reverse('cuentas:acceder'), respuesta.url)
+
+    def test_inventario_para_usuario_autenticado(self):
+        Usuario = get_user_model()
+        Usuario.objects.create_user('clienta', password='clave-segura-123')
+        self.client.login(username='clienta', password='clave-segura-123')
         respuesta = self.client.get(reverse('catalogo:inventario'))
         self.assertEqual(respuesta.status_code, 200)
         self.assertContains(respuesta, 'Inventario de materiales')

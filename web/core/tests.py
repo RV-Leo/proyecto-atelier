@@ -1,5 +1,6 @@
 """Pruebas de la app core: inicio e informes."""
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
@@ -13,7 +14,23 @@ class InicioTests(TestCase):
         self.assertContains(respuesta, 'ATELIER')
         self.assertContains(respuesta, 'Tu próxima inspiración')
 
-    def test_informes_responde(self):
+    def test_informes_requieren_autenticacion(self):
+        respuesta = self.client.get(reverse('informes:informes'))
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertIn(reverse('cuentas:acceder'), respuesta.url)
+
+    def test_informes_solo_para_administradores(self):
+        Usuario = get_user_model()
+        Usuario.objects.create_user('clienta', password='clave-segura-123')
+        self.client.login(username='clienta', password='clave-segura-123')
+        self.assertEqual(self.client.get(reverse('informes:informes')).status_code, 403)
+
+    def test_informes_para_administrador(self):
+        Usuario = get_user_model()
+        Usuario.objects.create_user(
+            'admin_web', password='clave-segura-123', is_staff=True
+        )
+        self.client.login(username='admin_web', password='clave-segura-123')
         respuesta = self.client.get(reverse('informes:informes'))
         self.assertEqual(respuesta.status_code, 200)
         self.assertContains(respuesta, 'Informes')

@@ -1,14 +1,159 @@
-"""Pruebas de cuentas: registro, perfil, favoritos y colecciones."""
+"""Pruebas de cuentas: autenticación, roles, privacidad, perfil y colecciones."""
 
-from django.contrib.auth import get_user_model
+from django.contrib.auth import authenticate, get_user_model
+from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
 from catalogo.models import Categoria, Producto
+from core.permisos import GRUPO_ADMINISTRADORES, es_administrador
+from disenador.models import PropuestaDiseno
 
 from .models import Coleccion, Favorito, Perfil
 
 Usuario = get_user_model()
+
+
+class CuentasConfiguracionTests(TestCase):
+    """Verifica las cuentas y permisos creados por configurar_cuentas."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command('configurar_cuentas', verbosity=0)
+
+    def test_las_tres_cuentas_existen(self):
+        for username in ('administracion', 'cliente', 'admin'):
+            self.assertTrue(
+                Usuario.objects.filter(username=username).exists(),
+                f'Falta la cuenta {username}',
+            )
+
+    def test_contrasenas_funcionan(self):
+        self.assertIsNotNone(authenticate(username='administracion', password='123456'))
+        self.assertIsNotNone(authenticate(username='cliente', password='123456'))
+        self.assertIsNotNone(authenticate(username='admin', password='admin'))
+
+    def test_administracion_es_administrador_de_la_web(self):
+        usuario = Usuario.objects.get(username='administracion')
+        self.assertTrue(es_administrador(usuario))
+        self.assertTrue(usuario.groups.filter(name=GRUPO_ADMINISTRADORES).exists())
+        self.assertFalse(usuario.is_superuser)
+
+    def test_cliente_no_tiene_rol_administrativo(self):
+        cliente = Usuario.objects.get(username='cliente')
+        self.assertFalse(es_administrador(cliente))
+        self.assertFalse(cliente.is_staff)
+        self.assertFalse(cliente.is_superuser)
+        self.assertFalse(cliente.groups.filter(name=GRUPO_ADMINISTRADORES).exists())
+
+    def test_admin_es_superusuario(self):
+        self.assertTrue(Usuario.objects.get(username='admin').is_superuser)
+
+    def test_comando_es_idempotente(self):
+        call_command('configurar_cuentas', verbosity=0)
+        call_command('configurar_cuentas', verbosity=0)
+        self.assertEqual(Usuario.objects.filter(username='administracion').count(), 1)
+        self.assertEqual(Usuario.objects.filter(username='cliente').count(), 1)
+        self.assertEqual(Usuario.objects.filter(username='admin').count(), 1)
+
+
+class RolesYAccesoTests(TestCase):
+    """Redirecciones por permisos y protección de las vistas administrativas."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command('configurar_cuentas', verbosity=0)
+
+    def test_administracion_inicia_sesion_y_va_al_panel(self):
+        respuesta = self.client.post(
+            reverse('cuentas:acceder'),
+            {'username': 'administracion', 'password': '123456'},
+        )
+        self.assertRedirects(respuesta, reverse('panel:inicio'))
+
+    def test_cliente_inicia_sesion_y_va_a_la_web(self):
+        respuesta = self.client.post(
+            reverse('cuentas:acceder'),
+            {'username': 'cliente', 'password': '123456'},
+        )
+        self.assertRedirects(respuesta, reverse('core:inicio'))
+
+    def test_anonimo_no_accede_al_panel(self):
+        respuesta = self.client.get(reverse('panel:inicio'))
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertIn(reverse('cuentas:acceder'), respuesta.url)
+
+    def test_cliente_no_accede_al_panel(self):
+        self.client.login(username='cliente', password='123456')
+        self.assertEqual(self.client.get(reverse('panel:inicio')).status_code, 403)
+        self.assertEqual(self.client.get(reverse('panel:usuarios')).status_code, 403)
+
+    def test_administracion_accede_al_panel(self):
+        self.client.login(username='administracion', password='123456')
+        respuesta = self.client.get(reverse('panel:inicio'))
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, 'Panel administrativo')
+
+    def test_administracion_accede_a_usuarios(self):
+        self.client.login(username='administracion', password='123456')
+        self.assertEqual(self.client.get(reverse('panel:usuarios')).status_code, 200)
+
+    def test_informes_requieren_administrador(self):
+        # Anónimo -> redirige al acceso.
+        respuesta = self.client.get(reverse('informes:informes'))
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertIn(reverse('cuentas:acceder'), respuesta.url)
+        # Cliente -> 403.
+        self.client.login(username='cliente', password='123456')
+        self.assertEqual(self.client.get(reverse('informes:informes')).status_code, 403)
+        # Administrador -> 200.
+        self.client.logout()
+        self.client.login(username='administracion', password='123456')
+        self.assertEqual(self.client.get(reverse('informes:informes')).status_code, 200)
+
+    def test_cerrar_sesion_finaliza_la_sesion(self):
+        self.client.login(username='cliente', password='123456')
+        respuesta = self.client.post(reverse('cuentas:salir'))
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertNotIn('_auth_user_id', self.client.session)
+
+    def test_admin_oficial_entra_en_django_admin(self):
+        self.client.login(username='admin', password='admin')
+        self.assertEqual(self.client.get(reverse('admin:index')).status_code, 200)
+
+    def test_cliente_no_entra_en_django_admin(self):
+        self.client.login(username='cliente', password='123456')
+        respuesta = self.client.get(reverse('admin:index'))
+        self.assertIn(respuesta.status_code, (302, 403))
+
+
+class PrivacidadTests(TestCase):
+    """Cada cliente solo accede a sus propios datos privados."""
+
+    def setUp(self):
+        self.duena = Usuario.objects.create_user('duena', password='clave-segura-123')
+        self.otro = Usuario.objects.create_user('otro', password='clave-segura-123')
+        self.coleccion = Coleccion.objects.create(nombre='Privada de Dueña', usuario=self.duena)
+        self.propuesta = PropuestaDiseno.objects.create(usuario=self.duena, prompt='vestido privado')
+        self.client.login(username='otro', password='clave-segura-123')
+
+    def test_no_puede_ver_coleccion_privada_ajena(self):
+        respuesta = self.client.get(
+            reverse('cuentas:coleccion_detalle', args=[self.coleccion.slug])
+        )
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertEqual(respuesta.url, reverse('cuentas:perfil'))
+
+    def test_no_puede_marcar_favorita_una_propuesta_ajena(self):
+        respuesta = self.client.post(
+            reverse('disenador:alternar_favorita', args=[self.propuesta.pk])
+        )
+        self.assertEqual(respuesta.status_code, 404)
+
+    def test_historial_no_muestra_propuestas_ajenas(self):
+        respuesta = self.client.get(reverse('disenador:historial'))
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertNotContains(respuesta, 'vestido privado')
 
 
 class RegistroTests(TestCase):
