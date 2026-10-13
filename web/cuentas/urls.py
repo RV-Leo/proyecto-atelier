@@ -11,6 +11,7 @@ urlpatterns = [
     path('acceder/', views.AccesoView.as_view(), name='acceder'),
     path('salir/', auth_views.LogoutView.as_view(), name='salir'),
     path('registro/', views.registro, name='registro'),
+    path('panel/', views.panel, name='panel'),
     path('perfil/', views.perfil, name='perfil'),
     path('favorito/<int:producto_id>/alternar/', views.favorito_alternar, name='favorito_alternar'),
     path('colecciones/nueva/', views.coleccion_nueva, name='coleccion_nueva'),

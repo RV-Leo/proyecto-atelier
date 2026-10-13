@@ -1,13 +1,23 @@
 {% extends 'base.html' %}
 
-{% block titulo %}Acceder · ATELIER{% endblock %}
+{% block titulo %}Iniciar sesión · ATELIER{% endblock %}
 
 {% block contenido %}
   <section class="seccion">
     <div class="contenedor">
       <div class="panel-autenticar">
-        <h1>Acceder</h1>
+        <h1>Iniciar sesión</h1>
         <p class="centrado" style="color:var(--gris-texto)">Entra en tu cuenta para diseñar, guardar tus propuestas y gestionar tus colecciones.</p>
+
+        {% if next %}
+          <div class="acceso-aviso">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.6 4.6 1.9-4.6 1.9L12 16l-1.9-4.6-4.6-1.9 4.6-1.9L12 3z"/><path d="M19 14l.9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9L19 14z"/></svg>
+            <div>
+              <strong>Tu próximo diseño empieza aquí.</strong>
+              Inicia sesión o crea tu cuenta para guardar tus ideas, crear colecciones y personalizar tu experiencia en ATELIER.
+            </div>
+          </div>
+        {% endif %}
 
         {% if form.non_field_errors %}
           <div class="errores-no-campo">{{ form.non_field_errors }}</div>
@@ -15,7 +25,7 @@
 
         <form class="formulario" method="post" action="{% url 'cuentas:acceder' %}" style="margin-top:1.4rem">
           {% csrf_token %}
-          <input type="hidden" name="next" value="{{ next }}">
+          {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
 
           <div class="campo">
             <label for="{{ form.username.id_for_label }}">Nombre de usuario</label>
@@ -32,8 +42,12 @@
           <button class="btn btn-primario btn-bloque" type="submit">Entrar</button>
         </form>
 
-        <p class="pie-form" style="margin-top:1.4rem">
-          ¿Aún no tienes cuenta? <a class="enlace-resaltado" href="{% url 'cuentas:registro' %}">Crea una ahora</a>
+        <div class="acceso-acciones">
+          <a class="btn btn-ghost btn-bloque" href="{% url 'cuentas:registro' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Crear cuenta</a>
+        </div>
+
+        <p class="pie-form" style="margin-top:1.2rem">
+          ¿Aún no tienes cuenta? <a class="enlace-resaltado" href="{% url 'cuentas:registro' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Crea una ahora</a>
         </p>
       </div>
     </div>

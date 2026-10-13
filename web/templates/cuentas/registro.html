@@ -15,6 +15,7 @@
 
         <form class="formulario" method="post" action="{% url 'cuentas:registro' %}" style="margin-top:1.4rem">
           {% csrf_token %}
+          {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
 
           <div class="campo">
             <label for="{{ form.username.id_for_label }}">Nombre de usuario</label>
@@ -45,7 +46,7 @@
         </form>
 
         <p class="pie-form" style="margin-top:1.4rem">
-          ¿Ya tienes cuenta? <a class="enlace-resaltado" href="{% url 'cuentas:acceder' %}">Accede aquí</a>
+          ¿Ya tienes cuenta? <a class="enlace-resaltado" href="{% url 'cuentas:acceder' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Inicia sesión</a>
         </p>
       </div>
     </div>
