@@ -10,6 +10,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
@@ -57,6 +58,11 @@ public class Material {
 
     @Column(name = "actualizado_en", nullable = false)
     private Instant actualizadoEn;
+
+    @PrePersist
+    private void alPersistir() {
+        actualizadoEn = Instant.now();
+    }
 
     @PreUpdate
     private void alActualizar() {
