@@ -8,11 +8,18 @@ from core.management.commands.cargar_demo import Command as CargarDemo
 
 
 class InicioTests(TestCase):
-    def test_inicio_responde(self):
+    def test_inicio_publico_responde(self):
         respuesta = self.client.get(reverse('core:inicio'))
         self.assertEqual(respuesta.status_code, 200)
         self.assertContains(respuesta, 'ATELIER')
-        self.assertContains(respuesta, 'Tu próxima inspiración')
+        self.assertContains(respuesta, 'Del hilo a la idea')
+
+    def test_portada_invita_a_iniciar_sesion_o_crear_cuenta(self):
+        respuesta = self.client.get(reverse('core:inicio'))
+        self.assertContains(respuesta, 'Iniciar sesión')
+        self.assertContains(respuesta, 'Crear cuenta')
+        self.assertContains(respuesta, reverse('cuentas:acceder'))
+        self.assertContains(respuesta, reverse('cuentas:registro'))
 
     def test_informes_requieren_autenticacion(self):
         respuesta = self.client.get(reverse('informes:informes'))

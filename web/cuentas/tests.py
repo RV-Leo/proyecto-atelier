@@ -71,12 +71,12 @@ class RolesYAccesoTests(TestCase):
         )
         self.assertRedirects(respuesta, reverse('panel:inicio'))
 
-    def test_cliente_inicia_sesion_y_va_a_la_web(self):
+    def test_cliente_inicia_sesion_y_va_a_su_panel(self):
         respuesta = self.client.post(
             reverse('cuentas:acceder'),
             {'username': 'cliente', 'password': '123456'},
         )
-        self.assertRedirects(respuesta, reverse('core:inicio'))
+        self.assertRedirects(respuesta, reverse('cuentas:panel'))
 
     def test_anonimo_no_accede_al_panel(self):
         respuesta = self.client.get(reverse('panel:inicio'))
@@ -168,7 +168,7 @@ class RegistroTests(TestCase):
             'password1': 'una-clave-muy-segura-9',
             'password2': 'una-clave-muy-segura-9',
         })
-        self.assertRedirects(respuesta, reverse('cuentas:perfil'))
+        self.assertRedirects(respuesta, reverse('cuentas:panel'))
         usuario = Usuario.objects.get(username='nueva')
         self.assertTrue(Perfil.objects.filter(usuario=usuario).exists())
         self.assertEqual(int(self.client.session['_auth_user_id']), usuario.pk)
@@ -273,3 +273,81 @@ class ColeccionTests(TestCase):
         coleccion = Coleccion.objects.create(nombre='Borrar', usuario=self.usuario)
         self.client.post(reverse('cuentas:coleccion_eliminar', args=[coleccion.slug]))
         self.assertFalse(Coleccion.objects.filter(pk=coleccion.pk).exists())
+
+
+class SeparacionDeExperienciasTests(TestCase):
+    """Visitante, cliente y administrador ven experiencias claramente distintas."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command('configurar_cuentas', verbosity=0)
+
+    def test_visitante_ve_portada_publica(self):
+        respuesta = self.client.get(reverse('core:inicio'))
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, 'Del hilo a la idea')
+        self.assertContains(respuesta, 'Iniciar sesión')
+        self.assertContains(respuesta, 'Crear cuenta')
+
+    def test_cliente_no_ve_la_portada_sino_su_dashboard(self):
+        self.client.login(username='cliente', password='123456')
+        self.assertRedirects(
+            self.client.get(reverse('core:inicio')), reverse('cuentas:panel')
+        )
+        panel = self.client.get(reverse('cuentas:panel'))
+        self.assertEqual(panel.status_code, 200)
+        self.assertContains(panel, 'Mi espacio privado')
+        # La experiencia del cliente no mezcla herramientas administrativas.
+        self.assertNotContains(panel, 'Panel administrativo')
+        self.assertNotContains(panel, 'Django Admin')
+
+    def test_administrador_no_ve_el_dashboard_de_cliente(self):
+        self.client.login(username='administracion', password='123456')
+        self.assertRedirects(
+            self.client.get(reverse('cuentas:panel')), reverse('panel:inicio')
+        )
+
+    def test_administrador_es_enviado_al_panel_desde_inicio(self):
+        self.client.login(username='administracion', password='123456')
+        self.assertRedirects(
+            self.client.get(reverse('core:inicio')), reverse('panel:inicio')
+        )
+
+    def test_visitante_es_enviado_al_acceso_con_destino(self):
+        respuesta = self.client.get(reverse('cuentas:panel'))
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertIn(reverse('cuentas:acceder'), respuesta.url)
+        self.assertIn('next=', respuesta.url)
+
+    def test_login_ignora_destino_administrativo_para_cliente(self):
+        respuesta = self.client.post(
+            f"{reverse('cuentas:acceder')}?next={reverse('panel:inicio')}",
+            {'username': 'cliente', 'password': '123456'},
+        )
+        self.assertRedirects(respuesta, reverse('cuentas:panel'))
+
+    def test_login_ignora_destino_externo(self):
+        respuesta = self.client.post(
+            f"{reverse('cuentas:acceder')}?next=https://sitio-falso.example/",
+            {'username': 'cliente', 'password': '123456'},
+        )
+        self.assertRedirects(respuesta, reverse('cuentas:panel'))
+
+    def test_login_muestra_aviso_amigable_con_destino(self):
+        respuesta = self.client.get(
+            f"{reverse('cuentas:acceder')}?next={reverse('disenador:historial')}"
+        )
+        self.assertContains(respuesta, 'Tu próximo diseño empieza aquí')
+
+    def test_registro_conserva_destino_seguro(self):
+        respuesta = self.client.post(
+            reverse('cuentas:registro'),
+            {
+                'username': 'connext',
+                'email': 'connext@atelier.local',
+                'password1': 'clave-muy-segura-123',
+                'password2': 'clave-muy-segura-123',
+                'next': reverse('disenador:historial'),
+            },
+        )
+        self.assertRedirects(respuesta, reverse('disenador:historial'))
