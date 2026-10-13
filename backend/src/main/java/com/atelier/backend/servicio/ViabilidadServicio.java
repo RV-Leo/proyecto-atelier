@@ -16,6 +16,7 @@ import com.atelier.backend.dominio.AnalisisViabilidad;
 import com.atelier.backend.dominio.Material;
 import com.atelier.backend.dominio.Prenda;
 import com.atelier.backend.dominio.PrendaMaterial;
+import com.atelier.backend.ia.ClienteIa;
 import com.atelier.backend.repositorio.AlternativaStockRepository;
 import com.atelier.backend.repositorio.AnalisisViabilidadRepository;
 import com.atelier.backend.repositorio.MaterialRepository;
@@ -49,18 +50,21 @@ public class ViabilidadServicio {
     private final MaterialRepository materiales;
     private final AnalisisViabilidadRepository analisis;
     private final AlternativaStockRepository alternativas;
+    private final ClienteIa clienteIa;
 
     public ViabilidadServicio(
             PrendaRepository prendas,
             PrendaMaterialRepository fichaTecnica,
             MaterialRepository materiales,
             AnalisisViabilidadRepository analisis,
-            AlternativaStockRepository alternativas) {
+            AlternativaStockRepository alternativas,
+            ClienteIa clienteIa) {
         this.prendas = prendas;
         this.fichaTecnica = fichaTecnica;
         this.materiales = materiales;
         this.analisis = analisis;
         this.alternativas = alternativas;
+        this.clienteIa = clienteIa;
     }
 
     /** Devuelve la ficha técnica de una prenda con el estado de cada material. */
@@ -120,11 +124,22 @@ public class ViabilidadServicio {
                         .intValue();
         boolean viable = total > 0 && cubiertos == total;
 
+        // Spring Boot decide; el modelo solo narra. Si no hay servidor de IA o
+        // no contesta, se conserva el comentario de plantilla.
+        String comentario = redactar(prenda, viable, puntaje, total - cubiertos);
+        if (clienteIa.disponible()) {
+            String narrado = clienteIa.explicarViabilidad(new ClienteIa.ContextoViabilidad(
+                    prenda, viable, puntaje, detalles, alternativasVista));
+            if (narrado != null && !narrado.isBlank()) {
+                comentario = narrado;
+            }
+        }
+
         AnalisisViabilidad registro = new AnalisisViabilidad();
         registro.setPrenda(prenda);
         registro.setViable(viable);
         registro.setPuntaje(puntaje);
-        registro.setComentario(redactar(prenda, viable, puntaje, total - cubiertos));
+        registro.setComentario(comentario);
         AnalisisViabilidad guardado = analisis.save(registro);
 
         for (AlternativaStock alternativa : alternativasGuardadas) {

@@ -26,6 +26,11 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                        // Las imágenes generadas son recursos estáticos: un
+                        // <img> no puede mandar cabeceras Basic Auth, así que
+                        // si esto quedaba protegido los diseños no se veían.
+                        // El endpoint que las genera sí sigue protegido.
+                        .requestMatchers("/imagenes/**").permitAll()
                         .anyRequest().authenticated())
                 .httpBasic(Customizer.withDefaults());
         return http.build();

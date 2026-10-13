@@ -31,3 +31,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Imagenes generadas por el puente de IA (artefactos de ejecucion) ###
+imagenes-diseno/

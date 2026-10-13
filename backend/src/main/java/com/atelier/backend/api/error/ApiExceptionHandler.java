@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
+import com.atelier.backend.ia.IaNoDisponibleException;
+
 import jakarta.persistence.EntityNotFoundException;
 
 /**
@@ -47,6 +49,17 @@ public class ApiExceptionHandler {
                     + java.util.Arrays.toString(ex.getRequiredType().getEnumConstants());
         }
         return responder(HttpStatus.BAD_REQUEST, mensaje, null);
+    }
+
+    /**
+     * El servidor de IA no respondió.
+     *
+     * <p>503 y no 500: el fallo es del proveedor de modelos, no de la petición.
+     * Así quien llama sabe que puede reintentar más tarde y no culpa a su JSON.
+     */
+    @ExceptionHandler(IaNoDisponibleException.class)
+    public ResponseEntity<ErrorApi> iaNoDisponible(IaNoDisponibleException ex) {
+        return responder(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), null);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

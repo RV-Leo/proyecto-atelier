@@ -1,8 +1,12 @@
-# backend — API REST
+# backend — API REST y puente de IA
 
 API REST del proyecto Atelier construida con Spring Boot. Es el punto único de
 acceso a los datos: la web (Django) y la app móvil consumen esta API en lugar de
 conectarse directamente a la base de datos.
+
+Además, hace de **puente de IA**: habla con el servidor de modelos (Qwen) para
+redactar el comentario de viabilidad y generar las propuestas de diseño. Ver
+[Puente de IA](#puente-de-ia).
 
 ## Requisitos
 
@@ -72,7 +76,7 @@ un checksum y fallará al arrancar).
 ## Autenticación
 
 Todos los endpoints requieren autenticación HTTP Basic, excepto los de
-`/actuator`.
+`/actuator` y las imágenes en `/imagenes/**`.
 
 - Usuario: `spring.security.user.name` (por defecto `user`)
 - Contraseña: `spring.security.user.password` (configúrala en
@@ -190,6 +194,80 @@ puede producir" es una respuesta válida, no un error.
 `urlOrigem` es única: si la URL ya fue registrada la API responde `409 Conflict`
 en lugar de duplicar el registro.
 
+### Diseño
+
+| Método | Ruta | Descripción |
+| --- | --- | --- |
+| GET | `/prendas/{id}/diseno/prompt` | Prompt de imagen listo para un modelo (lo redacta la IA o cae en plantilla) |
+| POST | `/prendas/{id}/diseno/propuestas` | Genera imágenes de diseño y las guarda en disco |
+| GET | `/prendas/{id}/diseno/propuestas` | Lista las propuestas generadas |
+| PUT | `/prendas/{id}/diseno/propuestas/{propuestaId}/seleccion` | Marca una propuesta como la elegida |
+
+Al generar, la prenda pasa de `BORRADOR` a `GENERADA`. Cada propuesta devuelve
+`imagenUrl` bajo `/imagenes/...`, que es un recurso estático **sin
+autenticación** (un `<img>` no puede mandar cabeceras Basic Auth).
+
+```bash
+# Ver el prompt que se enviaría al modelo
+curl -u user:tu-password http://localhost:8080/api/v1/prendas/1/diseno/prompt
+
+# Generar 2 propuestas
+curl -u user:tu-password -X POST http://localhost:8080/api/v1/prendas/1/diseno/propuestas \
+  -H "Content-Type: application/json" -d '{"cantidad": 2}'
+```
+
+Respuesta del prompt:
+
+```json
+{ "prompt": "Vestido de verano...", "fuente": "MODELO" }
+```
+
+`fuente` es `MODELO` cuando la IA respondió y `PLANTILLA` cuando no estaba
+disponible (ver más abajo). **El prompt nunca queda vacío.**
+
+`cantidad` se limita a 4 por petición.
+
+## Puente de IA
+
+El backend **decide**, el modelo **narra**. El cálculo de viabilidad (stock,
+puntaje, alternativas) es determinístico y vive en Java; el modelo solo redacta
+el comentario y las instrucciones de imagen. Si la IA falla o no está
+configurada, la API sigue funcionando igual, con texto de plantilla.
+
+Esto sigue `docs/modelos-ia.md` (pasos 4 y 5): la API no depende de Django para
+responder, y el `ClienteIa` abstrae el servidor de inferencia para poder apuntar
+a vLLM, Ollama, LM Studio o el gateway de Django sin tocar la lógica.
+
+### Configuración
+
+| Propiedad | Variable de entorno | Por defecto | Descripción |
+| --- | --- | --- | --- |
+| `atelier.ia.url` | `IA_URL` | *(vacío)* | URL base del servidor compatible con OpenAI, p. ej. `http://localhost:8000/v1`. **Vacío = IA deshabilitada.** |
+| `atelier.ia.api-key` | `IA_API_KEY` | *(vacío)* | Bearer opcional |
+| `atelier.ia.modelo-texto` | `IA_MODELO_TEXTO` | `Qwen3.6-35B-A3B` | Modelo para chat (comentario, prompt) |
+| `atelier.ia.modelo-imagen` | `IA_MODELO_IMAGEN` | `Qwen-Image` | Modelo para imágenes |
+| `atelier.ia.timeout-segundos` | `IA_TIMEOUT_SEGUNDOS` | `120` | Límite de espera. `<= 0` = sin límite |
+| `atelier.ia.directorio-imagenes` | `IA_DIRECTORIO_IMAGENES` | `imagenes-diseno` | Dónde se guardan los PNG en base64 |
+
+### Comportamiento
+
+| Situación | Texto / imágenes | HTTP |
+| --- | --- | --- |
+| `IA_URL` vacía (por defecto) | Plantilla local | `200` |
+| IA responde | Texto del modelo (`fuente: MODELO`) | `200` |
+| IA falla o no responde | Plantilla (texto) / error (imágenes) | `200` / `503` |
+
+Las imágenes **no** tienen respaldo: si el servidor de modelos no genera
+imágenes, el endpoint devuelve `503 Service Unavailable`, porque una imagen de
+plantilla sería un engaño.
+
+Para habilitar la IA:
+
+```bash
+export IA_URL=http://localhost:8000/v1
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+```
+
 ## Errores
 
 Todos los errores devuelven el mismo cuerpo:
@@ -210,6 +288,7 @@ Todos los errores devuelven el mismo cuerpo:
 | `401` | Sin autenticación o credenciales incorrectas |
 | `404` | El recurso no existe |
 | `409` | Conflicto de unicidad (URL de tendencia repetida) |
+| `503` | El servidor de IA no respondió al generar imágenes |
 
 ## Tests
 
