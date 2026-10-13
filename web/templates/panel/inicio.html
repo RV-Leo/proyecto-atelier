@@ -1,0 +1,239 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Panel administrativo · ATELIER{% endblock %}
+
+{% block contenido %}
+  <section class="seccion">
+    <div class="contenedor">
+
+      <div class="panel-encabezado">
+        <div>
+          <h1>Panel administrativo</h1>
+          <p>Bienvenida, {{ user.get_username }}. Gestiona el contenido de ATELIER y revisa los indicadores en tiempo real.</p>
+        </div>
+        <div class="accesos-cuenta" style="gap:.5rem">
+          <a class="btn btn-claro btn-compacto" href="{% url 'informes:informes' %}">Ver informes</a>
+          <a class="btn btn-ghost btn-compacto" style="border-color:rgba(255,255,255,.5);color:#fff" href="{% url 'admin:index' %}">Django Admin</a>
+        </div>
+      </div>
+
+      <div class="metricas">
+        {% for indicador in indicadores %}
+          <div class="metrica revelar">
+            <div class="metrica-valor" data-contador="{{ indicador.valor }}">0</div>
+            <div class="metrica-etiqueta">{{ indicador.etiqueta }}</div>
+          </div>
+        {% endfor %}
+      </div>
+
+      <div class="panel-seccion">
+        <div class="panel-seccion-cabecera">
+          <h2>Gestión de contenidos</h2>
+          <span style="color:var(--gris-texto);font-size:.9rem">Crea, edita y elimina registros desde el panel de Django.</span>
+        </div>
+        <div class="panel-acciones">
+          <a class="panel-accion" href="{% url 'admin:catalogo_producto_changelist' %}">
+            <div class="panel-accion-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7"/></svg></div>
+            <div><strong>Productos</strong><span>Prendas, telas y accesorios</span></div>
+          </a>
+          <a class="panel-accion" href="{% url 'admin:catalogo_categoria_changelist' %}">
+            <div class="panel-accion-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 5h16v14H4zM4 9h16M10 9v10"/></svg></div>
+            <div><strong>Categorías</strong><span>Organización del catálogo</span></div>
+          </a>
+          <a class="panel-accion" href="{% url 'admin:catalogo_material_changelist' %}">
+            <div class="panel-accion-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div>
+            <div><strong>Inventario</strong><span>Telas, materiales y avíos</span></div>
+          </a>
+          <a class="panel-accion" href="{% url 'admin:tendencias_tendencia_changelist' %}">
+            <div class="panel-accion-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 17l6-6 4 4 7-7"/><path d="M14 7h6v6"/></svg></div>
+            <div><strong>Tendencias</strong><span>Colores, telas y estilos</span></div>
+          </a>
+          <a class="panel-accion" href="{% url 'admin:disenador_propuestadiseno_changelist' %}">
+            <div class="panel-accion-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 3l2.2 5.2L20 9l-4 4 1 6-5-3-5 3 1-6-4-4 5.8-.8L12 3z"/></svg></div>
+            <div><strong>Diseños y propuestas</strong><span>Resultados del diseñador IA</span></div>
+          </a>
+          <a class="panel-accion" href="{% url 'admin:cuentas_coleccion_changelist' %}">
+            <div class="panel-accion-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 5h16v14H4zM4 9h16M9 9v10"/></svg></div>
+            <div><strong>Colecciones</strong><span>Conjuntos del catálogo y de clientes</span></div>
+          </a>
+          <a class="panel-accion" href="{% url 'panel:usuarios' %}">
+            <div class="panel-accion-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.3 3-6 7-6s7 2.7 7 6"/></svg></div>
+            <div><strong>Usuarios y permisos</strong><span>Cuentas, grupos y roles</span></div>
+          </a>
+          <a class="panel-accion" href="{% url 'informes:informes' %}">
+            <div class="panel-accion-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></div>
+            <div><strong>Informes</strong><span>Estadísticas y distribución</span></div>
+          </a>
+        </div>
+      </div>
+
+      <div class="panel-seccion">
+        <div class="panel-seccion-cabecera">
+          <h2>Productos por categoría</h2>
+        </div>
+        <div class="carta carta-texto">
+          {% if grafico_categorias %}
+            <div class="grafico-barras">
+              {% for fila in grafico_categorias %}
+                <div class="grafico-fila">
+                  <span>{{ fila.nombre }}</span>
+                  <div class="barra"><span style="width: {{ fila.ancho }}%"></span></div>
+                  <span>{{ fila.total }}</span>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p style="color:var(--gris-texto)">Sin categorías registradas.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="panel-seccion">
+        <div class="panel-seccion-cabecera">
+          <h2>Productos recientes</h2>
+          <a class="enlace-cabecera" href="{% url 'admin:catalogo_producto_changelist' %}">Gestionar productos</a>
+        </div>
+        <div class="tabla-contenedor">
+          <table class="tabla">
+            <thead>
+              <tr><th>Producto</th><th>Categoría</th><th>Tipo</th><th>Precio</th><th>Unidades</th><th>Estado</th></tr>
+            </thead>
+            <tbody>
+              {% for producto in productos_recientes %}
+                <tr>
+                  <td>{{ producto.nombre }}</td>
+                  <td>{{ producto.categoria.nombre }}</td>
+                  <td>{{ producto.get_tipo_display }}</td>
+                  <td>$ {{ producto.precio|floatformat:2 }}</td>
+                  <td>{{ producto.unidades }}</td>
+                  <td>
+                    {% if not producto.disponible %}
+                      <span class="insignia insignia-agotado">Agotado</span>
+                    {% elif producto.es_tendencia %}
+                      <span class="insignia insignia-tendencia">Tendencia</span>
+                    {% elif producto.es_nuevo %}
+                      <span class="insignia insignia-nuevo">Nuevo</span>
+                    {% else %}
+                      <span class="estado estado-disponible">Disponible</span>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="6">Sin productos registrados.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel-seccion">
+        <div class="panel-seccion-cabecera">
+          <h2>Inventario con stock bajo</h2>
+          <a class="enlace-cabecera" href="{% url 'admin:catalogo_material_changelist' %}">Gestionar inventario</a>
+        </div>
+        <div class="tabla-contenedor">
+          <table class="tabla">
+            <thead>
+              <tr><th>Material</th><th>Categoría</th><th>Cantidad</th><th>Mínimo</th><th>Estado</th></tr>
+            </thead>
+            <tbody>
+              {% for material in materiales_bajo %}
+                <tr>
+                  <td>{{ material.nombre }}</td>
+                  <td>{{ material.categoria }}</td>
+                  <td>{{ material.cantidad }} {{ material.get_unidad_medida_display }}</td>
+                  <td>{{ material.stock_minimo }}</td>
+                  <td><span class="estado estado-{{ material.estado }}">{{ material.estado|capfirst }}</span></td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="5">Todo el inventario está por encima del mínimo.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel-seccion">
+        <div class="panel-seccion-cabecera">
+          <h2>Tendencias destacadas</h2>
+          <a class="enlace-cabecera" href="{% url 'admin:tendencias_tendencia_changelist' %}">Gestionar tendencias</a>
+        </div>
+        <div class="tabla-contenedor">
+          <table class="tabla">
+            <thead>
+              <tr><th>Tendencia</th><th>Tipo</th><th>Temporada</th><th>Popularidad</th><th>Activa</th></tr>
+            </thead>
+            <tbody>
+              {% for tendencia in tendencias %}
+                <tr>
+                  <td>{{ tendencia.nombre }}</td>
+                  <td>{{ tendencia.get_tipo_display }}</td>
+                  <td>{{ tendencia.temporada }}</td>
+                  <td>{{ tendencia.popularidad }}%</td>
+                  <td>{% if tendencia.activa %}Sí{% else %}No{% endif %}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="5">Sin tendencias registradas.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel-seccion">
+        <div class="panel-seccion-cabecera">
+          <h2>Propuestas de diseño recientes</h2>
+          <a class="enlace-cabecera" href="{% url 'admin:disenador_propuestadiseno_changelist' %}">Ver todas</a>
+        </div>
+        <div class="tabla-contenedor">
+          <table class="tabla">
+            <thead>
+              <tr><th>Usuario</th><th>Tipo</th><th>Estilo</th><th>Favorita</th><th>Creada</th></tr>
+            </thead>
+            <tbody>
+              {% for propuesta in propuestas_recientes %}
+                <tr>
+                  <td>{{ propuesta.usuario.get_username }}</td>
+                  <td>{{ propuesta.tipo_prenda|capfirst }}</td>
+                  <td>{{ propuesta.estilo }}</td>
+                  <td>{% if propuesta.es_favorita %}★{% else %}—{% endif %}</td>
+                  <td>{{ propuesta.creada|date:'d/m/Y H:i' }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="5">Sin propuestas registradas.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel-seccion">
+        <div class="panel-seccion-cabecera">
+          <h2>Colecciones recientes</h2>
+          <a class="enlace-cabecera" href="{% url 'admin:cuentas_coleccion_changelist' %}">Gestionar colecciones</a>
+        </div>
+        <div class="tabla-contenedor">
+          <table class="tabla">
+            <thead>
+              <tr><th>Colección</th><th>Propietario</th><th>Productos</th><th>Recomendada</th><th>Creada</th></tr>
+            </thead>
+            <tbody>
+              {% for coleccion in colecciones_recientes %}
+                <tr>
+                  <td>{{ coleccion.nombre }}</td>
+                  <td>{% if coleccion.usuario %}{{ coleccion.usuario.get_username }}{% else %}<span class="rol-insignia rol-cliente">ATELIER</span>{% endif %}</td>
+                  <td>{{ coleccion.productos.count }}</td>
+                  <td>{% if coleccion.es_recomendada %}Sí{% else %}No{% endif %}</td>
+                  <td>{{ coleccion.creada|date:'d/m/Y' }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="5">Sin colecciones registradas.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </section>
+{% endblock %}

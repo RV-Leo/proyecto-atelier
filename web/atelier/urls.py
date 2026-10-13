@@ -13,6 +13,7 @@ urlpatterns = [
     path('disenador/', include('disenador.urls')),
     path('cuentas/', include('cuentas.urls')),
     path('informes/', include('core.urls_informes')),
+    path('panel/', include('core.urls_panel')),
 ]
 
 if settings.DEBUG:

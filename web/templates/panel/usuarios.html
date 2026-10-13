@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Usuarios y permisos · ATELIER{% endblock %}
+
+{% block contenido %}
+  <section class="seccion">
+    <div class="contenedor">
+      <div class="seccion-cabecera">
+        <div>
+          <h1 class="seccion-titulo">Usuarios y permisos</h1>
+          <p class="seccion-subtitulo" style="margin-bottom:0">Cuentas registradas y su rol dentro de ATELIER.</p>
+        </div>
+        <div class="accesos-cuenta" style="gap:.5rem">
+          <a class="btn btn-ghost btn-compacto" href="{% url 'panel:inicio' %}">Volver al panel</a>
+          <a class="btn btn-primario btn-compacto" href="{% url 'admin:auth_user_changelist' %}">Gestionar usuarios (Django)</a>
+        </div>
+      </div>
+
+      <div class="tabla-contenedor">
+        <table class="tabla">
+          <thead>
+            <tr><th>Usuario</th><th>Correo</th><th>Rol</th><th>Activo</th><th>Grupos</th><th>Alta</th></tr>
+          </thead>
+          <tbody>
+            {% for fila in filas %}
+              <tr>
+                <td>{{ fila.usuario.get_username }}</td>
+                <td>{{ fila.usuario.email|default:'—' }}</td>
+                <td><span class="rol-insignia {{ fila.clase }}">{{ fila.rol }}</span></td>
+                <td>{% if fila.usuario.is_active %}Sí{% else %}No{% endif %}</td>
+                <td>
+                  {% for grupo in fila.usuario.groups.all %}{{ grupo.name }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}
+                </td>
+                <td>{{ fila.usuario.date_joined|date:'d/m/Y' }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="6">Sin usuarios registrados.</td></tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+      <div class="nota-demo" style="margin-top:1.6rem">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+        <div>
+          <strong>Grupos y permisos.</strong> El acceso administrativo se concede mediante el grupo
+          <strong>Administradores</strong> (o marcando al usuario como staff). Los clientes no pueden
+          asignarse permisos desde la web.
+        </div>
+      </div>
+
+    </div>
+  </section>
+{% endblock %}
