@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Informes · ATELIER{% endblock %}
+
+{% block contenido %}
+  <section class="seccion">
+    <div class="contenedor">
+      <div class="seccion-cabecera">
+        <div>
+          <h1 class="seccion-titulo">Informes</h1>
+          <p class="seccion-subtitulo" style="margin-bottom:0">Indicadores reales calculados a partir de la base de datos del proyecto.</p>
+        </div>
+      </div>
+
+      <div class="metricas">
+        <div class="metrica revelar">
+          <div class="metrica-valor" data-contador="{{ total_productos }}">0</div>
+          <div class="metrica-etiqueta">Prendas y telas registradas</div>
+        </div>
+        <div class="metrica revelar">
+          <div class="metrica-valor" data-contador="{{ total_materiales }}">0</div>
+          <div class="metrica-etiqueta">Materiales en inventario</div>
+        </div>
+        <div class="metrica revelar">
+          <div class="metrica-valor" data-contador="{{ total_tendencias }}">0</div>
+          <div class="metrica-etiqueta">Tendencias activas</div>
+        </div>
+        <div class="metrica revelar">
+          <div class="metrica-valor" data-contador="{{ total_propuestas }}">0</div>
+          <div class="metrica-etiqueta">Propuestas de diseño</div>
+        </div>
+        <div class="metrica revelar">
+          <div class="metrica-valor" data-contador="{{ total_colecciones }}">0</div>
+          <div class="metrica-etiqueta">Colecciones</div>
+        </div>
+        <div class="metrica revelar">
+          <div class="metrica-valor" data-contador="{{ stock_productos }}">0</div>
+          <div class="metrica-etiqueta">Unidades de producto</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion fondo-claro">
+    <div class="contenedor" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:32px">
+      <div class="carta carta-texto">
+        <h2 style="font-size:1.2rem">Productos por categoría</h2>
+        <p style="color:var(--gris-texto);font-size:.9rem">Distribución del catálogo registrado.</p>
+        {% if grafico_categorias %}
+          <div class="grafico-barras">
+            {% for fila in grafico_categorias %}
+              <div class="grafico-fila">
+                <span>{{ fila.nombre }}</span>
+                <div class="barra"><span style="width: {{ fila.ancho }}%"></span></div>
+                <span>{{ fila.total }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p style="color:var(--gris-texto)">Sin datos disponibles.</p>
+        {% endif %}
+      </div>
+
+      <div class="carta carta-texto">
+        <h2 style="font-size:1.2rem">Estado del inventario</h2>
+        <p style="color:var(--gris-texto);font-size:.9rem">Situación de los {{ total_materiales }} materiales registrados.</p>
+        <div class="grafico-barras">
+          {% for estado in estados %}
+            <div class="grafico-fila">
+              <span>{{ estado.etiqueta }}</span>
+              <div class="barra"><span style="width: {{ estado.ancho }}%"></span></div>
+              <span>{{ estado.total }}</span>
+            </div>
+          {% endfor %}
+        </div>
+        <p style="margin-top:1rem;font-size:.9rem;color:var(--gris-texto)">
+          Stock total de materiales: <strong style="color:var(--marino)">{{ stock_materiales|floatformat:0 }}</strong> unidades ·
+          productos agotados: <strong style="color:var(--marino)">{{ agotados_productos }}</strong>
+        </p>
+      </div>
+
+      <div class="carta carta-texto">
+        <h2 style="font-size:1.2rem">Tendencias con mayor popularidad</h2>
+        <p style="color:var(--gris-texto);font-size:.9rem">Indicador curado por el equipo de ATELIER.</p>
+        {% if tendencias_top %}
+          <div class="grafico-barras">
+            {% for tendencia in tendencias_top %}
+              <div class="grafico-fila">
+                <span>{{ tendencia.nombre }}</span>
+                <div class="barra"><span style="width: {{ tendencia.popularidad }}%"></span></div>
+                <span>{{ tendencia.popularidad }}%</span>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p style="color:var(--gris-texto)">Sin tendencias registradas.</p>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion">
+    <div class="contenedor">
+      <div class="nota-demo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+        <div>
+          <strong>Datos calculados en vivo.</strong> Todos los indicadores se obtienen de la base de datos del proyecto.
+          Los datos iniciales son de demostración y se cargan con <code>python manage.py cargar_demo</code>.
+        </div>
+      </div>
+    </div>
+  </section>
+{% endblock %}

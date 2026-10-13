@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Acceder · ATELIER{% endblock %}
+
+{% block contenido %}
+  <section class="seccion">
+    <div class="contenedor">
+      <div class="panel-autenticar">
+        <h1>Acceder</h1>
+        <p class="centrado" style="color:var(--gris-texto)">Bienvenido de vuelta a ATELIER.</p>
+
+        {% if form.non_field_errors %}
+          <div class="errores-no-campo">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <form class="formulario" method="post" action="{% url 'cuentas:acceder' %}" style="margin-top:1.4rem">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ next }}">
+
+          <div class="campo">
+            <label for="{{ form.username.id_for_label }}">Nombre de usuario</label>
+            {{ form.username }}
+            {% if form.username.errors %}<ul class="campo-errores">{{ form.username.errors }}</ul>{% endif %}
+          </div>
+
+          <div class="campo">
+            <label for="{{ form.password.id_for_label }}">Contraseña</label>
+            {{ form.password }}
+            {% if form.password.errors %}<ul class="campo-errores">{{ form.password.errors }}</ul>{% endif %}
+          </div>
+
+          <button class="btn btn-primario btn-bloque" type="submit">Entrar</button>
+        </form>
+
+        <p class="pie-form" style="margin-top:1.4rem">
+          ¿Aún no tienes cuenta? <a class="enlace-resaltado" href="{% url 'cuentas:registro' %}">Crea una ahora</a>
+        </p>
+        <p class="pie-form" style="font-size:.78rem">
+          Demostración: <strong>admin / admin</strong> o <strong>atelier_demo / demo12345</strong>
+        </p>
+      </div>
+    </div>
+  </section>
+{% endblock %}

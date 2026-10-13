@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block titulo %}Mis propuestas · ATELIER{% endblock %}
+
+{% block contenido %}
+  <section class="seccion">
+    <div class="contenedor">
+      <div class="seccion-cabecera">
+        <div>
+          <h1 class="seccion-titulo">Mis propuestas</h1>
+          <p class="seccion-subtitulo" style="margin-bottom:0">Tu historial de diseños generados con el asistente.</p>
+        </div>
+        <div class="accesos-cuenta" style="gap:.5rem">
+          <a class="btn btn-ghost btn-compacto {% if filtro == 'todas' %}btn-suave{% endif %}" href="{% url 'disenador:historial' %}">Todas ({{ request.user.propuestas.count }})</a>
+          <a class="btn btn-ghost btn-compacto {% if filtro == 'favoritas' %}btn-suave{% endif %}" href="{% url 'disenador:historial' %}?filtro=favoritas">Favoritas</a>
+          <a class="btn btn-primario btn-compacto" href="{% url 'disenador:asistente' %}">+ Nuevo diseño</a>
+        </div>
+      </div>
+
+      {% if propuestas %}
+        <div class="rejilla-estrecha">
+          {% for propuesta in propuestas %}
+            <article class="carta">
+              <div class="carta-imagen">
+                <div class="carta-insignia">
+                  <span class="insignia insignia-demo">Demo</span>
+                  {% if propuesta.es_favorita %}<span class="insignia insignia-nuevo">★ Favorita</span>{% endif %}
+                </div>
+                {% if propuesta.imagen %}
+                  <img src="{{ propuesta.imagen.url }}" alt="{{ propuesta.resultado_resumen|default:propuesta.prompt }}" loading="lazy">
+                {% else %}
+                  <img src="{% static 'img/placeholder.svg' %}" alt="Propuesta" loading="lazy">
+                {% endif %}
+              </div>
+              <div class="carta-cuerpo">
+                <span class="carta-categoria">{{ propuesta.get_tipo_prenda_display|default:propuesta.tipo_prenda }} · {{ propuesta.estilo }}</span>
+                <h3 class="carta-nombre">{{ propuesta.resultado_resumen|truncatewords:10 }}</h3>
+                <p class="carta-descripcion">Paleta: {{ propuesta.paleta }}</p>
+                <p class="carta-descripcion" style="font-size:.8rem;color:var(--gris-texto)">{{ propuesta.creada|date:'d/m/Y H:i' }}</p>
+                <form method="post" action="{% url 'disenador:alternar_favorita' propuesta.pk %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="next" value="{{ request.path }}">
+                  <button class="btn {% if propuesta.es_favorita %}btn-suave{% else %}btn-ghost{% endif %} btn-bloque btn-compacto" type="submit">
+                    {% if propuesta.es_favorita %}★ Quitar de favoritas{% else %}☆ Guardar como favorita{% endif %}
+                  </button>
+                </form>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="vacio">
+          <div class="vacio-icono">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.6 4.6 1.9-4.6 1.9L12 16l-1.9-4.6-4.6-1.9 4.6-1.9L12 3z"/></svg>
+          </div>
+          <h3>Aún no tienes propuestas</h3>
+          <p>Prueba el diseñador IA y tu historial aparecerá aquí.</p>
+          <a class="btn btn-primario" href="{% url 'disenador:asistente' %}">Generar mi primera idea</a>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+{% endblock %}

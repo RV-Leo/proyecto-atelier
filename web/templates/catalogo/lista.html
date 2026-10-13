@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Catálogo · ATELIER{% endblock %}
+
+{% block contenido %}
+  <section class="seccion">
+    <div class="contenedor">
+      <div class="seccion-cabecera">
+        <div>
+          <h1 class="seccion-titulo">Catálogo</h1>
+          <p class="seccion-subtitulo" style="margin-bottom:0">
+            {% if categoria_activa %}Categoría: {{ categoria_activa.nombre }}{% else %}Prendas, telas y accesorios de ATELIER.{% endif %}
+          </p>
+        </div>
+        <span style="color:var(--gris-texto);font-size:.9rem">{{ pagina.paginator.count }} producto{{ pagina.paginator.count|pluralize }}</span>
+      </div>
+
+      <form class="filtros" method="get" action="{% url 'catalogo:lista' %}">
+        <input type="search" name="q" value="{{ filtros.q }}" placeholder="Buscar por nombre o descripción…" aria-label="Buscar">
+        <select name="categoria" aria-label="Categoría">
+          <option value="">Todas las categorías</option>
+          {% for cat in categorias %}
+            <option value="{{ cat.slug }}" {% if filtros.categoria == cat.slug %}selected{% endif %}>{{ cat.nombre }}</option>
+          {% endfor %}
+        </select>
+        <select name="tipo" aria-label="Tipo de producto">
+          <option value="">Todo tipo</option>
+          <option value="PRENDA" {% if filtros.tipo == 'PRENDA' %}selected{% endif %}>Prenda</option>
+          <option value="TELA" {% if filtros.tipo == 'TELA' %}selected{% endif %}>Tela</option>
+          <option value="ACCESORIO" {% if filtros.tipo == 'ACCESORIO' %}selected{% endif %}>Accesorio</option>
+        </select>
+        <select name="temporada" aria-label="Temporada">
+          <option value="">Toda temporada</option>
+          <option value="PV" {% if filtros.temporada == 'PV' %}selected{% endif %}>Primavera-Verano</option>
+          <option value="OI" {% if filtros.temporada == 'OI' %}selected{% endif %}>Otoño-Invierno</option>
+          <option value="AT" {% if filtros.temporada == 'AT' %}selected{% endif %}>Atemporal</option>
+        </select>
+        <select name="estilo" aria-label="Estilo">
+          <option value="">Todo estilo</option>
+          {% for est in estilos %}
+            <option value="{{ est }}" {% if filtros.estilo == est %}selected{% endif %}>{{ est }}</option>
+          {% endfor %}
+        </select>
+        <button class="btn btn-suave btn-compacto" type="submit">Filtrar</button>
+        {% if filtros.q or filtros.categoria or filtros.tipo or filtros.temporada or filtros.estilo %}
+          <a class="btn btn-ghost btn-compacto" href="{% url 'catalogo:lista' %}">Limpiar</a>
+        {% endif %}
+      </form>
+
+      {% if pagina.object_list %}
+        <div class="rejilla">
+          {% for producto in pagina.object_list %}
+            {% include 'partials/producto_card.html' %}
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="vacio">
+          <div class="vacio-icono">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+          </div>
+          <h3>Sin resultados</h3>
+          <p>No encontramos productos con esos criterios. Prueba con otra búsqueda o limpia los filtros.</p>
+          <a class="btn btn-primario" href="{% url 'catalogo:lista' %}">Ver todo el catálogo</a>
+        </div>
+      {% endif %}
+
+      {% include 'partials/paginacion.html' %}
+    </div>
+  </section>
+{% endblock %}

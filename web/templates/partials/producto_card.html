@@ -1,0 +1,29 @@
+{% load static %}
+{% comment %}Tarjeta de producto reutilizable en catálogo e inicio.{% endcomment %}
+<a href="{{ producto.get_absolute_url }}" class="carta revelar" style="--order: {{ forloop.counter }}">
+  <div class="carta-imagen">
+    <div class="carta-insignia">
+      {% if producto.estado == 'agotado' %}
+        <span class="insignia insignia-agotado">Agotado</span>
+      {% elif producto.estado == 'tendencia' %}
+        <span class="insignia insignia-tendencia">Tendencia</span>
+      {% elif producto.estado == 'nuevo' %}
+        <span class="insignia insignia-nuevo">Nuevo</span>
+      {% endif %}
+    </div>
+    {% if producto.imagen %}
+      <img src="{{ producto.imagen.url }}" alt="{{ producto.nombre }}" loading="lazy">
+    {% else %}
+      <img src="{% static 'img/placeholder.svg' %}" alt="{{ producto.nombre }}" loading="lazy">
+    {% endif %}
+  </div>
+  <div class="carta-cuerpo">
+    <span class="carta-categoria">{{ producto.categoria.nombre }}</span>
+    <h3 class="carta-nombre">{{ producto.nombre }}</h3>
+    <p class="carta-descripcion">{{ producto.descripcion|truncatewords:14 }}</p>
+    <div class="carta-pie">
+      <span class="carta-precio">$ {{ producto.precio|floatformat:2 }}</span>
+      <span class="carta-accion">Ver más →</span>
+    </div>
+  </div>
+</a>

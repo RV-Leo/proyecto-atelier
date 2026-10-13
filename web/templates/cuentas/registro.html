@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Crear cuenta · ATELIER{% endblock %}
+
+{% block contenido %}
+  <section class="seccion">
+    <div class="contenedor">
+      <div class="panel-autenticar">
+        <h1>Crear cuenta</h1>
+        <p class="centrado" style="color:var(--gris-texto)">Únete a ATELIER y guarda tus diseños y colecciones.</p>
+
+        {% if form.non_field_errors %}
+          <div class="errores-no-campo">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <form class="formulario" method="post" action="{% url 'cuentas:registro' %}" style="margin-top:1.4rem">
+          {% csrf_token %}
+
+          <div class="campo">
+            <label for="{{ form.username.id_for_label }}">Nombre de usuario</label>
+            {{ form.username }}
+            {% if form.username.errors %}<ul class="campo-errores">{{ form.username.errors }}</ul>{% endif %}
+          </div>
+
+          <div class="campo">
+            <label for="{{ form.email.id_for_label }}">Correo electrónico</label>
+            {{ form.email }}
+            {% if form.email.errors %}<ul class="campo-errores">{{ form.email.errors }}</ul>{% endif %}
+          </div>
+
+          <div class="campo">
+            <label for="{{ form.password1.id_for_label }}">Contraseña</label>
+            {{ form.password1 }}
+            {% if form.password1.errors %}<ul class="campo-errores">{{ form.password1.errors }}</ul>{% endif %}
+            <span class="ayuda">Mínimo 8 caracteres y que no sea una contraseña común.</span>
+          </div>
+
+          <div class="campo">
+            <label for="{{ form.password2.id_for_label }}">Confirmar contraseña</label>
+            {{ form.password2 }}
+            {% if form.password2.errors %}<ul class="campo-errores">{{ form.password2.errors }}</ul>{% endif %}
+          </div>
+
+          <button class="btn btn-primario btn-bloque" type="submit">Crear cuenta</button>
+        </form>
+
+        <p class="pie-form" style="margin-top:1.4rem">
+          ¿Ya tienes cuenta? <a class="enlace-resaltado" href="{% url 'cuentas:acceder' %}">Accede aquí</a>
+        </p>
+      </div>
+    </div>
+  </section>
+{% endblock %}

@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block titulo %}Tendencias · ATELIER{% endblock %}
+
+{% block contenido %}
+  <section class="seccion">
+    <div class="contenedor">
+      <div class="seccion-cabecera">
+        <div>
+          <h1 class="seccion-titulo">Tendencias textiles</h1>
+          <p class="seccion-subtitulo" style="margin-bottom:0">Colores, telas y estilos que marcan la temporada.</p>
+        </div>
+      </div>
+
+      <form class="filtros" method="get" action="{% url 'tendencias:lista' %}">
+        <input type="search" name="q" value="{{ filtros.q }}" placeholder="Buscar tendencia…" aria-label="Buscar tendencia">
+        <select name="tipo" aria-label="Tipo de tendencia">
+          <option value="">Todo tipo</option>
+          {% for valor, etiqueta in tipos %}
+            <option value="{{ valor }}" {% if filtros.tipo == valor %}selected{% endif %}>{{ etiqueta }}</option>
+          {% endfor %}
+        </select>
+        <select name="temporada" aria-label="Temporada">
+          <option value="">Toda temporada</option>
+          {% for temporada in temporadas %}
+            <option value="{{ temporada }}" {% if filtros.temporada == temporada %}selected{% endif %}>{{ temporada }}</option>
+          {% endfor %}
+        </select>
+        <button class="btn btn-suave btn-compacto" type="submit">Filtrar</button>
+        {% if filtros.q or filtros.tipo or filtros.temporada %}
+          <a class="btn btn-ghost btn-compacto" href="{% url 'tendencias:lista' %}">Limpiar</a>
+        {% endif %}
+      </form>
+
+      {% if tendencias %}
+        <div class="rejilla-estrecha">
+          {% for tendencia in tendencias %}
+          <article class="carta revelar" style="--order: {{ forloop.counter }}">
+            {% if tendencia.imagen or tendencia.color %}
+              <div class="carta-imagen" style="aspect-ratio: 16/10">
+                {% if tendencia.imagen %}
+                  <img src="{{ tendencia.imagen.url }}" alt="{{ tendencia.nombre }}" loading="lazy">
+                {% else %}
+                  <img src="{% static 'img/placeholder.svg' %}" alt="{{ tendencia.nombre }}" loading="lazy">
+                {% endif %}
+              </div>
+            {% endif %}
+            <div class="carta-cuerpo">
+              <span class="carta-categoria">{{ tendencia.get_tipo_display }}{% if tendencia.temporada %} · {{ tendencia.temporada }}{% endif %}</span>
+              <h3 class="carta-nombre" style="display:flex;align-items:center;gap:.5rem">
+                {% if tendencia.color %}<span style="width:16px;height:16px;border-radius:999px;background:{{ tendencia.color }};border:2px solid var(--azul-grisaceo)"></span>{% endif %}
+                {{ tendencia.nombre }}
+              </h3>
+              <p class="carta-descripcion">{{ tendencia.descripcion }}</p>
+              <div class="carta-pie">
+                <span style="font-size:.85rem;color:var(--gris-texto)"><strong>{{ tendencia.popularidad }}%</strong> de popularidad</span>
+              </div>
+              <div class="barra"><span style="width: {{ tendencia.popularidad }}%"></span></div>
+            </div>
+          </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="vacio">
+          <div class="vacio-icono">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 17l5-5 4 4 8-9"/><path d="M20 7h-3v3"/></svg>
+          </div>
+          <h3>Sin tendencias</h3>
+          <p>No encontramos tendencias con esos criterios.</p>
+          <a class="btn btn-primario" href="{% url 'tendencias:lista' %}">Ver todas</a>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="seccion fondo-marino">
+    <div class="contenedor" style="display:flex;gap:2rem;align-items:center;flex-wrap:wrap;justify-content:space-between">
+      <div style="max-width:560px">
+        <h2 style="color:#fff">¿Adónde van estos datos?</h2>
+        <p style="color:#b9c8d6;margin-bottom:0">
+          Las tendencias de demostración fueron curadas por el equipo de ATELIER.
+          En el futuro se conectarán fuentes reales (Pinterest y tiendas de marca)
+          mediante un servicio de análisis de imágenes con la familia de modelos Qwen.
+        </p>
+      </div>
+      <a class="btn btn-claro" href="{% url 'disenador:asistente' %}">Usarlas en el diseñador</a>
+    </div>
+  </section>
+{% endblock %}

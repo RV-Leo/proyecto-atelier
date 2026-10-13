@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block titulo %}Diseñador IA · ATELIER{% endblock %}
+
+{% block contenido %}
+  <section class="seccion">
+    <div class="contenedor">
+      <div class="seccion-cabecera">
+        <div>
+          <h1 class="seccion-titulo">Diseñador IA</h1>
+          <p class="seccion-subtitulo" style="margin-bottom:0">Describe tu idea y recibe propuestas coherentes con las tendencias y el inventario.</p>
+        </div>
+      </div>
+
+      <div class="nota-demo" style="margin-bottom:1.6rem">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+        <div>
+          <strong>Asistente en modo demostración.</strong> Las propuestas que ves son simuladas y combinan tu descripción con el
+          inventario real del proyecto. La arquitectura está lista para conectar el modelo Qwen-Image cuando esté disponible.
+        </div>
+      </div>
+
+      <div class="asistente-layout">
+        <div>
+          <form class="panel-diseno formulario" method="post" action="{% url 'disenador:asistente' %}" data-paleta>
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+              <div class="errores-no-campo">{{ form.non_field_errors }}</div>
+            {% endif %}
+
+            <div class="campo">
+              <label for="{{ form.descripcion.id_for_label }}">{{ form.descripcion.label }}</label>
+              {{ form.descripcion }}
+              {% if form.descripcion.errors %}<ul class="campo-errores">{{ form.descripcion.errors }}</ul>{% endif %}
+            </div>
+
+            <div class="campo">
+              <label for="{{ form.tipo_prenda.id_for_label }}">{{ form.tipo_prenda.label }}</label>
+              {{ form.tipo_prenda }}
+              {% if form.tipo_prenda.errors %}<ul class="campo-errores">{{ form.tipo_prenda.errors }}</ul>{% endif %}
+            </div>
+
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem">
+              <div class="campo">
+                <label for="{{ form.estilo.id_for_label }}">{{ form.estilo.label }}</label>
+                {{ form.estilo }}
+              </div>
+              <div class="campo">
+                <label for="{{ form.temporada.id_for_label }}">{{ form.temporada.label }}</label>
+                {{ form.temporada }}
+              </div>
+              <div class="campo">
+                <label for="{{ form.calidad.id_for_label }}">{{ form.calidad.label }}</label>
+                {{ form.calidad }}
+              </div>
+            </div>
+
+            <div class="campo">
+              <label>{{ form.paleta.label }}</label>
+              <div class="opciones-paleta">
+                {% for eleccion in form.paleta %}
+                  <label class="opcion-paleta {% if eleccion.data.value in form.paleta.value %}seleccionada{% endif %}">
+                    {{ eleccion.tag }}
+                    {{ eleccion.choice_label }}
+                  </label>
+                {% endfor %}
+              </div>
+              {% if form.paleta.errors %}<ul class="campo-errores">{{ form.paleta.errors }}</ul>{% endif %}
+            </div>
+
+            <button class="btn btn-primario btn-bloque" type="submit">Generar propuestas</button>
+            <p class="ayuda" style="margin:0;text-align:center">
+              {% if user.is_authenticated %}
+                Tus propuestas se guardarán en tu historial.
+              {% else %}
+                <a href="{% url 'cuentas:acceder' %}">Inicia sesión</a> para guardar tus propuestas.
+              {% endif %}
+            </p>
+          </form>
+
+          <div class="tablero-conversacion carta-texto" style="max-height:none">
+            <div class="conversacion-head">
+              <h3>Conversación</h3>
+              {% if conversacion %}<span style="font-size:.8rem;color:var(--gris-texto)">{{ conversacion.creada|date:'d/m/Y H:i' }}</span>{% endif %}
+            </div>
+            <div class="conversacion-mensajes" style="max-height:340px;overflow-y:auto">
+              {% if conversacion %}
+                {% for mensaje in conversacion.mensajes.all %}
+                  <div class="mensaje mensaje-{% if mensaje.rol == 'usuario' %}usuario{% else %}asistente{% endif %}">
+                    {% if mensaje.rol == 'asistente' %}<strong>ATELIER</strong><br>{% endif %}
+                    {{ mensaje.texto|linebreaksbr }}
+                  </div>
+                {% endfor %}
+              {% else %}
+                <p class="conversacion-vacia">Aún no has hecho ninguna consulta. Describe una idea para empezar.</p>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <div>
+          {% if propuestas %}
+            <h2 class="seccion-titulo" style="font-size:1.4rem">Propuestas generadas</h2>
+            <p style="color:var(--gris-texto)">{{ propuestas|length }} propuesta{{ propuestas|pluralize }}{% if user.is_authenticated %} para "{{ conversacion.titulo }}"{% endif %}</p>
+            <div class="rejilla-estrecha">
+              {% for propuesta in propuestas %}
+                <article class="carta revelar visible">
+                  <div class="carta-imagen">
+                    <div class="carta-insignia">
+                      <span class="insignia insignia-demo">Demo</span>
+                      {% if propuesta.es_favorita %}<span class="insignia insignia-nuevo">★ Favorita</span>{% endif %}
+                    </div>
+                    {% if propuesta.imagen.url %}
+                      <img src="{{ propuesta.imagen.url }}" alt="{{ propuesta.resultado_resumen }}" loading="lazy">
+                    {% elif propuesta.imagen %}
+                      <img src="/media/{{ propuesta.imagen }}" alt="{{ propuesta.titulo }}" loading="lazy">
+                    {% else %}
+                      <img src="{% static 'img/placeholder.svg' %}" alt="Propuesta" loading="lazy">
+                    {% endif %}
+                  </div>
+                  <div class="carta-cuerpo">
+                    <span class="carta-categoria">{{ propuesta.tipo_prenda|default:'Propuesta' }} · {{ propuesta.estilo|default:'sin estilo' }}</span>
+                    <h3 class="carta-nombre">{{ propuesta.titulo|default:propuesta.resultado_resumen|truncatewords:8 }}</h3>
+                    <p class="carta-descripcion">{{ propuesta.resultado_resumen }}</p>
+                    <p class="carta-descripcion" style="font-size:.82rem">
+                      <strong>Materiales:</strong> {{ propuesta.materiales|default:'—' }}.<br>
+                      <strong>Viabilidad:</strong> {{ propuesta.viabilidad|default:'revisa el inventario' }}<br>
+                      {% if propuesta.nota %}<span style="color:var(--alerta)">{{ propuesta.nota }}</span>{% endif %}
+                    </p>
+                    {% if propuesta.pk and user.is_authenticated %}
+                      <form method="post" action="{% url 'disenador:alternar_favorita' propuesta.pk %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.path }}">
+                        <button class="btn {% if propuesta.es_favorita %}btn-suave{% else %}btn-ghost{% endif %} btn-bloque btn-compacto" type="submit">
+                          {% if propuesta.es_favorita %}★ Quitar de favoritas{% else %}☆ Guardar como favorita{% endif %}
+                        </button>
+                      </form>
+                    {% endif %}
+                  </div>
+                </article>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="vacio">
+              <div class="vacio-icono">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.6 4.6 1.9-4.6 1.9L12 16l-1.9-4.6-4.6-1.9 4.6-1.9L12 3z"/><path d="M19 14l.9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9L19 14z"/></svg>
+              </div>
+              <h3>Tus propuestas aparecerán aquí</h3>
+              <p>Completa el formulario y genera tus primeras ideas de diseño.</p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </section>
+{% endblock %}

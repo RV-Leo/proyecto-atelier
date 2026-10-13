@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+
+{% block contenido %}
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="contenedor hero-contenido">
+      <p class="hero-eyebrow">Colección · Primavera-Verano 2026</p>
+      <h1 class="hero-titulo">Tu próxima inspiración.</h1>
+      <p class="hero-texto">
+        Diseña prendas, explora las tendencias de la temporada y revisa si
+        tus ideas se pueden producir con el inventario real de ATELIER.
+      </p>
+      <div class="hero-acciones">
+        <a class="btn btn-claro" href="{% url 'disenador:asistente' %}">Probar el diseñador IA</a>
+        <a class="btn btn-ghost" style="border-color:#ffffff33;color:#fff" href="{% url 'catalogo:lista' %}">Explorar el catálogo</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Accesos rápidos -->
+  <section class="seccion" id="accesos">
+    <div class="contenedor">
+      <div class="seccion-cabecera">
+        <div>
+          <h2 class="seccion-titulo">Explora la plataforma</h2>
+          <p class="seccion-subtitulo" style="margin-bottom:0">Todo lo que necesitas para pasar de la idea a la prenda.</p>
+        </div>
+      </div>
+      <div class="accesos">
+        <a class="acceso revelar" href="{% url 'disenador:asistente' %}">
+          <div class="acceso-icono">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.6 4.6 1.9-4.6 1.9L12 16l-1.9-4.6-4.6-1.9 4.6-1.9L12 3z"/><path d="M19 14l.9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9L19 14z"/></svg>
+          </div>
+          <h3>Diseñador IA</h3>
+          <p>Describe tu idea y recibe propuestas que respetan las tendencias y el inventario disponible.</p>
+        </a>
+        <a class="acceso revelar" href="{% url 'catalogo:lista' %}">
+          <div class="acceso-icono">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4z"/><path d="M4 9h16"/><path d="M8 13v5"/></svg>
+          </div>
+          <h3>Catálogo</h3>
+          <p>Prendas, telas y accesorios con precio, composición y disponibilidad real.</p>
+        </a>
+        <a class="acceso revelar" href="{% url 'tendencias:lista' %}">
+          <div class="acceso-icono">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 4 8-9"/><path d="M20 7h-3v3"/></svg>
+          </div>
+          <h3>Tendencias</h3>
+          <p>Colores, telas y estilos destacados con popularidad de la temporada.</p>
+        </a>
+        <a class="acceso revelar" href="{% url 'catalogo:inventario' %}">
+          <div class="acceso-icono">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg>
+          </div>
+          <h3>Inventario</h3>
+          <p>Materiales, telas y stock para saber si una idea se puede producir.</p>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tendencias destacadas -->
+  <section class="seccion fondo-claro">
+    <div class="contenedor">
+      <div class="seccion-cabecera">
+        <div>
+          <h2 class="seccion-titulo">Tendencias de la temporada</h2>
+          <p class="seccion-subtitulo" style="margin-bottom:0">Lo que marca el tono de las próximas colecciones.</p>
+        </div>
+        <a class="enlace-cabecera" href="{% url 'tendencias:lista' %}">Ver todas →</a>
+      </div>
+      <div class="chips">
+        {% for tendencia in tendencias_moda %}
+          <a class="chip revelar" href="{% url 'tendencias:lista' %}" style="--order: {{ forloop.counter }}">
+            {% if tendencia.color %}<span class="burbuja" style="background:{{ tendencia.color }}"></span>{% endif %}
+            {{ tendencia.nombre }}
+            <span class="chip-popularidad">{{ tendencia.popularidad }}%</span>
+          </a>
+        {% empty %}
+          <p style="color: var(--gris-texto)">Aún no hay tendencias registradas.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <!-- Destacados del catálogo -->
+  <section class="seccion">
+    <div class="contenedor">
+      <div class="seccion-cabecera">
+        <div>
+          <h2 class="seccion-titulo">Piezas destacadas</h2>
+          <p class="seccion-subtitulo" style="margin-bottom:0">Prendas y telas seleccionadas por el equipo ATELIER.</p>
+        </div>
+        <a class="enlace-cabecera" href="{% url 'catalogo:lista' %}">Todo el catálogo →</a>
+      </div>
+      <div class="rejilla">
+        {% for producto in destacados %}
+          {% include 'partials/producto_card.html' %}
+        {% empty %}
+          <div class="vacio"><p>No hay productos destacados todavía.</p></div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <!-- Colecciones recomendadas -->
+  <section class="seccion fondo-marino">
+    <div class="contenedor">
+      <h2 class="seccion-titulo" style="color:#fff">Colecciones recomendadas</h2>
+      <p class="seccion-subtitulo" style="color:#b9c8d6">Ideas curadas para inspirar tu próxima cápsula.</p>
+      <div class="rejilla-estrecha">
+        {% for coleccion in colecciones %}
+          <a class="carta revelar" href="{% url 'cuentas:coleccion_detalle' slug=coleccion.slug %}">
+            <div class="carta-imagen" style="aspect-ratio: 16/10">
+              {% if coleccion.imagen %}
+                <img src="{{ coleccion.imagen.url }}" alt="{{ coleccion.nombre }}">
+              {% endif %}
+            </div>
+            <div class="carta-cuerpo">
+              <span class="carta-categoria">Colección · ATELIER</span>
+              <h3 class="carta-nombre">{{ coleccion.nombre }}</h3>
+              <p class="carta-descripcion">{{ coleccion.descripcion|truncatewords:16 }}</p>
+            </div>
+          </a>
+        {% empty %}
+          <p style="color:#b9c8d6">Aún no hay colecciones recomendadas.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <!-- Propuestas recientes / nuevas prendas -->
+  <section class="seccion">
+    <div class="contenedor">
+      <div class="seccion-cabecera">
+        <div>
+          <h2 class="seccion-titulo">Novedades del catálogo</h2>
+          <p class="seccion-subtitulo" style="margin-bottom:0">Lo último en llegar a la plataforma.</p>
+        </div>
+      </div>
+      <div class="rejilla">
+        {% for producto in nuevas %}
+          {% include 'partials/producto_card.html' %}
+        {% empty %}
+          <div class="vacio"><p>No hay novedades todavía.</p></div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+{% endblock %}

@@ -1,0 +1,113 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="ATELIER · Inteligencia textil. Diseña prendas, explora tendencias y revisa si puedes producir tus ideas.">
+  <title>{% block titulo %}ATELIER · Inteligencia textil{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <link rel="icon" href="{% static 'img/placeholder.svg' %}" type="image/svg+xml">
+</head>
+<body>
+
+  <header class="cabecera">
+    <div class="contenedor cabecera-inner">
+      <a class="marca" href="{% url 'core:inicio' %}" aria-label="Ir al inicio de ATELIER">
+        <span class="marca-nombre">Atelier</span>
+        <span class="marca-subtitulo">Inteligencia Textil</span>
+      </a>
+
+      <button class="boton-menu" type="button" data-menu-boton aria-label="Abrir menú">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+
+      <nav class="navegacion" data-menu>
+        <ul class="navegacion-enlaces">
+          <li><a href="{% url 'core:inicio' %}" class="{% if request.resolver_match.view_name == 'core:inicio' %}activo{% endif %}">Inicio</a></li>
+          <li><a href="{% url 'catalogo:lista' %}" class="{% if request.resolver_match.view_name == 'catalogo:lista' or request.resolver_match.view_name == 'catalogo:detalle' %}activo{% endif %}">Catálogo</a></li>
+          <li><a href="{% url 'tendencias:lista' %}" class="{% if request.resolver_match.view_name == 'tendencias:lista' %}activo{% endif %}">Tendencias</a></li>
+          <li><a href="{% url 'disenador:asistente' %}" class="{% if request.resolver_match.view_name == 'disenador:asistente' %}activo{% endif %}">Diseñador IA</a></li>
+          <li><a href="{% url 'catalogo:inventario' %}" class="{% if request.resolver_match.view_name == 'catalogo:inventario' %}activo{% endif %}">Inventario</a></li>
+          <li><a href="{% url 'core:inicio' %}#accesos" class="{% if request.resolver_match.view_name == 'informes:informes' %}activo{% endif %}">Informes</a></li>
+        </ul>
+
+        <form class="buscador-cabecera" action="{% url 'catalogo:lista' %}" method="get" role="search">
+          <input type="search" name="q" value="{{ request.GET.q }}" placeholder="Buscar prendas y telas…" aria-label="Buscar en el catálogo">
+          <button type="submit">Buscar</button>
+        </form>
+
+        <div class="accesos-cuenta">
+          {% if user.is_authenticated %}
+            <a class="btn btn-ghost btn-compacto" href="{% url 'cuentas:perfil' %}">Mi perfil</a>
+            <form action="{% url 'cuentas:salir' %}" method="post">
+              {% csrf_token %}
+              <button class="btn btn-suave btn-compacto" type="submit">Salir</button>
+            </form>
+          {% else %}
+            <a class="btn btn-ghost btn-compacto" href="{% url 'cuentas:acceder' %}">Acceder</a>
+            <a class="btn btn-primario btn-compacto" href="{% url 'cuentas:registro' %}">Crear cuenta</a>
+          {% endif %}
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  {% if messages %}
+    <div class="mensajes">
+      <div class="mensajes-inner">
+        {% for mensaje in messages %}
+          <div class="aviso aviso-{{ mensaje.tags }}">{{ mensaje }}</div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  <main>
+    {% block contenido %}{% endblock %}
+  </main>
+
+  <footer class="pie">
+    <div class="contenedor">
+      <div class="pie-columnas">
+        <div>
+          <div class="marca">
+            <span class="marca-nombre" style="color:#fff">Atelier</span>
+            <span class="marca-subtitulo">Inteligencia Textil</span>
+          </div>
+          <p style="margin-top:1rem; max-width:320px; font-size:0.92rem;">Del hilo a la idea. De la idea a la prenda. Diseña, explora tendencias y revisa si puedes producir tus ideas.</p>
+        </div>
+        <div>
+          <h4>Plataforma</h4>
+          <ul>
+            <li><a href="{% url 'catalogo:lista' %}">Catálogo</a></li>
+            <li><a href="{% url 'tendencias:lista' %}">Tendencias</a></li>
+            <li><a href="{% url 'disenador:asistente' %}">Diseñador IA</a></li>
+            <li><a href="{% url 'catalogo:inventario' %}">Inventario</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Tu cuenta</h4>
+          <ul>
+            {% if user.is_authenticated %}
+              <li><a href="{% url 'cuentas:perfil' %}">Mi perfil</a></li>
+              <li><a href="{% url 'disenador:historial' %}">Mis propuestas</a></li>
+            {% else %}
+              <li><a href="{% url 'cuentas:acceder' %}">Acceder</a></li>
+              <li><a href="{% url 'cuentas:registro' %}">Crear cuenta</a></li>
+            {% endif %}
+            <li><a href="{% url 'informes:informes' %}">Informes</a></li>
+            <li><a href="{% url 'admin:index' %}">Administración</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="pie-legal">
+        © {% now "Y" %} ATELIER · Proyecto de inteligencia textil. Desarrolado para uso educativo y de demostración.
+      </div>
+    </div>
+  </footer>
+
+  <script src="{% static 'js/app.js' %}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

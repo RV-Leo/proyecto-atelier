@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block titulo %}Mi perfil · ATELIER{% endblock %}
+
+{% block contenido %}
+  <section class="seccion">
+    <div class="contenedor">
+      <div class="seccion-cabecera">
+        <div>
+          <h1 class="seccion-titulo">Mi perfil</h1>
+          <p class="seccion-subtitulo" style="margin-bottom:0">Tus datos, colecciones, favoritos y propuestas.</p>
+        </div>
+        <div class="accesos-cuenta" style="gap:.5rem">
+          <a class="btn btn-ghost btn-compacto" href="{% url 'disenador:historial' %}">Historial de propuestas</a>
+          <a class="btn btn-primario btn-compacto" href="{% url 'disenador:asistente' %}">+ Nuevo diseño</a>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:28px;align-items:start">
+
+        <!-- Datos y preferencias -->
+        <div>
+          <div class="carta carta-texto">
+            <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.2rem">
+              <div class="avatar-mini" style="width:64px;height:64px;font-size:1.4rem">
+                {{ user.get_username|slice:':1' }}
+              </div>
+              <div>
+                <h2 style="margin:0;font-size:1.3rem">{{ perfil.nombre_artistico|default:user.get_username }}</h2>
+                <p style="color:var(--gris-texto);margin:0;font-size:.9rem">
+                  {{ user.get_full_name|default:'Miembro de ATELIER' }} · {{ user.email }}
+                </p>
+                {% if user.is_superuser %}<span class="insignia insignia-tendencia" style="margin-top:.4rem;display:inline-block">Administradora</span>{% endif %}
+              </div>
+            </div>
+            {% if perfil.bio %}<p style="color:var(--negro-suave)">{{ perfil.bio }}</p>{% endif %}
+            {% if perfil.ciudad %}<p style="color:var(--gris-texto);font-size:.9rem">📍 {{ perfil.ciudad }}</p>{% endif %}
+          </div>
+
+          <form class="carta carta-texto formulario" style="margin-top:20px" method="post" action="{% url 'cuentas:perfil' %}" enctype="multipart/form-data">
+            {% csrf_token %}
+            <h2 style="font-size:1.15rem;margin-bottom:.4rem">Preferencias y redes</h2>
+            <div class="campo">
+              <label for="{{ form.nombre_artistico.id_for_label }}">{{ form.nombre_artistico.label }}</label>
+              {{ form.nombre_artistico }}
+            </div>
+            <div class="campo">
+              <label for="{{ form.ciudad.id_for_label }}">{{ form.ciudad.label }}</label>
+              {{ form.ciudad }}
+            </div>
+            <div class="campo">
+              <label for="{{ form.bio.id_for_label }}">{{ form.bio.label }}</label>
+              {{ form.bio }}
+            </div>
+            <div class="campo">
+              <label for="{{ form.preferencias.id_for_label }}">{{ form.preferencias.label }}</label>
+              {{ form.preferencias }}
+              <span class="ayuda">{{ form.preferencias.help_text }}</span>
+            </div>
+            <div class="campo">
+              <label for="{{ form.avatar.id_for_label }}">{{ form.avatar.label }}</label>
+              {{ form.avatar }}
+            </div>
+            <label style="display:flex;align-items:center;gap:.5rem;font-size:.9rem">
+              {{ form.acepta_comunicaciones }} {{ form.acepta_comunicaciones.label }}
+            </label>
+            <button class="btn btn-primario" type="submit">Guardar cambios</button>
+          </form>
+        </div>
+
+        <!-- Colecciones, favoritos y propuestas -->
+        <div style="display:grid;gap:28px">
+          <div class="carta carta-texto">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.8rem">
+              <h2 style="font-size:1.15rem;margin:0">Mis colecciones</h2>
+              <a class="btn btn-suave btn-compacto" href="{% url 'cuentas:coleccion_nueva' %}">+ Nueva</a>
+            </div>
+            {% if colecciones %}
+              <ul class="listado-ligero">
+                {% for coleccion in colecciones %}
+                  <li>
+                    <a style="font-weight:600;color:var(--marino)" href="{% url 'cuentas:coleccion_detalle' slug=coleccion.slug %}">{{ coleccion.nombre }}</a>
+                    <span style="color:var(--gris-texto);font-size:.85rem">{{ coleccion.productos.count }} producto{{ coleccion.productos.count|pluralize }}</span>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <p style="color:var(--gris-texto)">Aún no tienes colecciones. <a class="enlace-resaltado" href="{% url 'cuentas:coleccion_nueva' %}">Crea la primera</a>.</p>
+            {% endif %}
+          </div>
+
+          <div class="carta carta-texto">
+            <h2 style="font-size:1.15rem;margin-bottom:.8rem">Mis favoritos</h2>
+            {% if favoritos %}
+              <ul class="listado-ligero">
+                {% for favorito in favoritos %}
+                  <li>
+                    <a style="font-weight:600;color:var(--marino)" href="{{ favorito.producto.get_absolute_url }}">{{ favorito.producto.nombre }}</a>
+                    <span style="color:var(--gris-texto);font-size:.85rem">$ {{ favorito.producto.precio|floatformat:2 }}</span>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <p style="color:var(--gris-texto)">Toca ☆en cualquier producto para guardarlo aquí.</p>
+            {% endif %}
+          </div>
+
+          <div class="carta carta-texto">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.8rem">
+              <h2 style="font-size:1.15rem;margin:0">Propuestas recientes</h2>
+              <a class="btn btn-ghost btn-compacto" href="{% url 'disenador:historial' %}">Ver todas</a>
+            </div>
+            {% if propuestas %}
+              <ul class="listado-ligero">
+                {% for propuesta in propuestas %}
+                  <li>
+                    <span>
+                      <strong style="color:var(--marino)">{{ propuesta.tipo_prenda|capfirst }}</strong>
+                      {% if propuesta.es_favorita %} ★{% endif %}
+                      <span style="color:var(--gris-texto);font-size:.85rem;display:block">{{ propuesta.creada|date:'d/m/Y' }}</span>
+                    </span>
+                    <span style="color:var(--gris-texto);font-size:.85rem">{{ propuesta.estilo }}</span>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <p style="color:var(--gris-texto)">Aún no has generado propuestas de diseño.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+{% endblock %}
