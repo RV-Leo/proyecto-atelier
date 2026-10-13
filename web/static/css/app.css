@@ -498,3 +498,48 @@ p { margin: 0 0 1rem; }
 
 .metrica-icono { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--gris-claro); color: var(--marino); margin-bottom: 0.9rem; }
 .metrica-icono svg { width: 18px; height: 18px; }
+
+/* ---------- Portada pública (visitante) ---------- */
+.hero-editorial { padding: 86px 0 96px; }
+.hero-editorial-grid { display: grid; grid-template-columns: 1fr; gap: 40px; align-items: center; position: relative; }
+@media (min-width: 940px) { .hero-editorial-grid { grid-template-columns: 1.05fr 0.95fr; } }
+.hero-editorial .hero-contenido { position: relative; max-width: none; }
+.hero-nota { color: #9db0be; font-size: 0.85rem; margin-top: 1.4rem; max-width: 460px; }
+.btn-borde-claro { background: transparent; border-color: rgba(255, 255, 255, 0.55); color: var(--blanco); }
+.btn-borde-claro:hover { background: rgba(255, 255, 255, 0.12); border-color: var(--blanco); transform: translateY(-1px); }
+.hero-editorial-imagen { position: relative; border-radius: var(--radio); overflow: hidden; box-shadow: 0 30px 60px rgba(6, 16, 28, 0.45); aspect-ratio: 4 / 5; max-height: 560px; }
+.hero-editorial-imagen img { width: 100%; height: 100%; object-fit: cover; }
+.hero-editorial-sello { position: absolute; left: 16px; bottom: 16px; background: rgba(16, 34, 56, 0.78); color: var(--blanco); font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; padding: 0.4rem 0.8rem; border-radius: 999px; }
+
+.ventajas { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 20px; }
+.ventaja { background: var(--blanco); border: 1px solid var(--borde); border-top: 3px solid var(--marino); border-radius: var(--radio); padding: 1.4rem 1.5rem; box-shadow: var(--sombra-carta); }
+.ventaja h3 { font-size: 1.05rem; margin-bottom: 0.4rem; }
+.ventaja p { color: var(--gris-texto); font-size: 0.92rem; margin: 0; }
+
+.disenador-presentacion { display: grid; grid-template-columns: 1fr; gap: 32px; align-items: center; }
+@media (min-width: 900px) { .disenador-presentacion { grid-template-columns: 1.3fr 1fr; } }
+.disenador-pasos { list-style: none; margin: 0; padding: 0; display: grid; gap: 1rem; }
+.disenador-pasos li { display: flex; gap: 0.9rem; align-items: center; color: #e7eef3; font-size: 0.95rem; }
+.disenador-pasos li span { flex-shrink: 0; width: 34px; height: 34px; border-radius: 999px; display: grid; place-items: center; background: rgba(255, 255, 255, 0.14); color: var(--blanco); font-weight: 700; }
+
+/* ---------- Aviso de acceso para visitantes ---------- */
+.acceso-aviso { display: flex; gap: 0.9rem; align-items: flex-start; background: #eef3f6; border: 1px solid var(--azul-grisaceo); border-left: 4px solid var(--marino); border-radius: var(--radio-suave); padding: 1.1rem 1.2rem; color: var(--marino-suave); font-size: 0.95rem; margin-top: 1.4rem; }
+.acceso-aviso.amplio { margin: 0 0 1.6rem; }
+.acceso-aviso svg { flex-shrink: 0; width: 24px; height: 24px; color: var(--marino); margin-top: 2px; }
+.acceso-aviso strong { color: var(--marino); }
+.acceso-aviso-acciones { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.9rem; }
+.acceso-acciones { margin-top: 1rem; }
+
+/* ---------- Dashboard del cliente ---------- */
+.cliente-hero { display: grid; grid-template-columns: 1fr; gap: 2rem; background: linear-gradient(135deg, var(--gris-claro), var(--azul-grisaceo)); border-radius: var(--radio); padding: 2.4rem; box-shadow: var(--sombra-carta); }
+@media (min-width: 940px) { .cliente-hero { grid-template-columns: 1.4fr 1fr; align-items: center; } }
+.cliente-eyebrow { display: inline-block; font-size: 0.76rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--marino-claro); margin-bottom: 0.8rem; }
+.cliente-hero-texto h1 { font-family: var(--fuente-editorial); font-size: clamp(1.9rem, 4vw, 2.6rem); }
+.cliente-hero-texto p { color: var(--marino-suave); max-width: 540px; margin-bottom: 0; }
+.cliente-hero-acciones { display: flex; flex-wrap: wrap; gap: 0.8rem; margin-top: 1.4rem; }
+.cliente-hero-metricas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.cliente-hero-metricas .metrica { padding: 1.1rem 1rem; text-align: center; }
+.cliente-hero-metricas .metrica-valor { font-size: 1.7rem; }
+.cliente-hero-metricas .metrica-etiqueta { font-size: 0.68rem; }
+@media (max-width: 520px) { .cliente-hero-metricas { grid-template-columns: 1fr 1fr; } }
+.colecciones-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
