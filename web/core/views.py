@@ -2,34 +2,46 @@
 
 from django.contrib import messages
 from django.db.models import Count, Sum
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 
 from catalogo.models import Categoria, Material, Producto
 from cuentas.models import Coleccion
 from disenador.models import PropuestaDiseno
 from tendencias.models import Tendencia
 
-from .permisos import administrador_requerido
+from .permisos import administrador_requerido, es_administrador
 
 
 def inicio(request):
-    """Página principal de ATELIER."""
-    categorias = Categoria.objects.all()
-    destacados = Producto.objects.filter(es_destacado=True)[:8]
-    tendencias_moda = Tendencia.objects.filter(activa=True)[:6]
-    tendencias_catalogo = Producto.objects.filter(es_tendencia=True, es_destacado=True)[:4]
-    nuevas = Producto.objects.filter(es_nuevo=True)[:4]
-    colecciones = Coleccion.objects.filter(es_recomendada=True)[:4]
-    acceso_destacado = tendencias_catalogo.first()
+    """Portada pública de ATELIER.
+
+    Cada estado de sesión recibe una experiencia distinta:
+
+      · Visitante  -> portada pública de presentación.
+      · Cliente    -> su dashboard privado (``cuentas:panel``).
+      - Administrador: su panel administrativo (``panel:inicio``).
+    """
+    if es_administrador(request.user):
+        return redirect('panel:inicio')
+    if request.user.is_authenticated:
+        return redirect('cuentas:panel')
+
+    destacados = list(Producto.objects.filter(es_destacado=True)[:8])
+    nuevas = list(Producto.objects.filter(es_nuevo=True)[:4])
+    if not nuevas:
+        nuevas = list(Producto.objects.order_by('-creado')[:4])
+    portada = next(
+        (p for p in destacados if p.imagen),
+        destacados[0] if destacados else None,
+    )
 
     context = {
-        'categorias': categorias,
+        'categorias': Categoria.objects.all(),
         'destacados': destacados,
-        'tendencias_moda': tendencias_moda,
-        'tendencias_catalogo': tendencias_catalogo,
+        'tendencias_moda': Tendencia.objects.filter(activa=True).order_by('-popularidad')[:6],
+        'colecciones': Coleccion.objects.filter(es_recomendada=True)[:4],
         'nuevas': nuevas,
-        'colecciones': colecciones,
-        'acceso_destacado': acceso_destacado,
+        'producto_portada': portada,
     }
     return render(request, 'core/inicio.html', context)
 

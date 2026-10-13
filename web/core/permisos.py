@@ -31,6 +31,12 @@ def es_cliente(usuario):
     return bool(usuario and usuario.is_authenticated and not es_administrador(usuario))
 
 
+def _acceso_con_destino(request):
+    """Redirige al acceso conservando la URL solicitada como ``?next=``."""
+    acceso = reverse('cuentas:acceder')
+    return redirect(f'{acceso}?next={quote(request.get_full_path())}')
+
+
 def administrador_requerido(vista):
     """Restringe una vista a los administradores.
 
@@ -41,12 +47,29 @@ def administrador_requerido(vista):
     @wraps(vista)
     def _envoltorio(request, *args, **kwargs):
         if not request.user.is_authenticated:
-            acceso = reverse('cuentas:acceder')
-            return redirect(f'{acceso}?next={quote(request.get_full_path())}')
+            return _acceso_con_destino(request)
         if not es_administrador(request.user):
             raise PermissionDenied(
                 'No tienes permisos para acceder al área administrativa de ATELIER.'
             )
+        return vista(request, *args, **kwargs)
+
+    return _envoltorio
+
+
+def cliente_requerido(vista):
+    """Restringe una vista a los clientes autenticados (experiencia privada).
+
+    - Usuario anónimo: se redirige al acceso con ``?next=``.
+    - Administrador: se le envía a su panel para no mezclar las experiencias.
+    """
+
+    @wraps(vista)
+    def _envoltorio(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return _acceso_con_destino(request)
+        if es_administrador(request.user):
+            return redirect('panel:inicio')
         return vista(request, *args, **kwargs)
 
     return _envoltorio
