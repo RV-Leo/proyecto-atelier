@@ -1,5 +1,6 @@
 """Vistas del catálogo de ATELIER: listado, búsqueda, filtros y detalle."""
 
+from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, render
@@ -80,6 +81,7 @@ def detalle(request, slug):
     return render(request, 'catalogo/detalle.html', context)
 
 
+@login_required
 def inventario(request):
     """Inventario de materiales y telas con estado del stock."""
     materiales = Material.objects.all()

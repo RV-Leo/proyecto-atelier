@@ -9,6 +9,8 @@ from cuentas.models import Coleccion
 from disenador.models import PropuestaDiseno
 from tendencias.models import Tendencia
 
+from .permisos import administrador_requerido
+
 
 def inicio(request):
     """Página principal de ATELIER."""
@@ -32,6 +34,7 @@ def inicio(request):
     return render(request, 'core/inicio.html', context)
 
 
+@administrador_requerido
 def informes(request):
     """Estadísticas reales del proyecto a partir de la base de datos."""
     total_productos = Producto.objects.count()
