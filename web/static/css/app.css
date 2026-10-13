@@ -134,6 +134,7 @@ p { margin: 0 0 1rem; }
   border-radius: 999px;
   font-size: 0.92rem;
   color: var(--negro-suave);
+  white-space: nowrap;
   transition: background var(--transicion), color var(--transicion);
 }
 .navegacion-enlaces a:hover { background: var(--gris-claro); color: var(--marino); }
@@ -451,3 +452,49 @@ p { margin: 0 0 1rem; }
 @media (max-width: 600px) {
   .grafico-fila { grid-template-columns: 120px 1fr 40px; }
 }
+
+/* ---------- Panel administrativo ---------- */
+.panel-encabezado {
+  background: linear-gradient(135deg, #102238, #1c3350);
+  color: var(--blanco);
+  border-radius: var(--radio);
+  padding: 2rem 2.2rem;
+  margin-bottom: 2.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.4rem;
+  flex-wrap: wrap;
+  box-shadow: var(--sombra-suave);
+}
+.panel-encabezado h1 { color: var(--blanco); font-family: var(--fuente-editorial); margin-bottom: 0.3rem; }
+.panel-encabezado p { color: #cddae3; margin: 0; font-size: 0.95rem; }
+
+.panel-acciones { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.panel-accion {
+  display: flex; align-items: center; gap: 0.9rem;
+  background: var(--blanco); border: 1px solid var(--borde); border-radius: var(--radio);
+  padding: 1.1rem 1.2rem; box-shadow: var(--sombra-carta); transition: all var(--transicion);
+}
+.panel-accion:hover { transform: translateY(-3px); box-shadow: var(--sombra-suave); border-color: var(--azul-suave); }
+.panel-accion-icono {
+  width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center;
+  background: var(--gris-claro); color: var(--marino); flex-shrink: 0;
+}
+.panel-accion-icono svg { width: 22px; height: 22px; }
+.panel-accion strong { display: block; color: var(--marino); font-size: 0.98rem; }
+.panel-accion span { color: var(--gris-texto); font-size: 0.82rem; }
+
+.panel-seccion { margin-top: 2.6rem; }
+.panel-seccion-cabecera { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.panel-seccion-cabecera h2 { font-size: 1.35rem; margin: 0; }
+
+.rol-insignia {
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 0.28rem 0.6rem; border-radius: 999px; display: inline-block;
+}
+.rol-administrador { background: rgba(16, 34, 56, 0.9); color: var(--blanco); }
+.rol-cliente { background: var(--azul-grisaceo); color: var(--marino); }
+
+.metrica-icono { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--gris-claro); color: var(--marino); margin-bottom: 0.9rem; }
+.metrica-icono svg { width: 18px; height: 18px; }

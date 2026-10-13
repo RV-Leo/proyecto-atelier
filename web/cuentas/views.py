@@ -1,15 +1,40 @@
-"""Vistas de cuentas: registro, perfil, favoritos y colecciones."""
+"""Vistas de cuentas: acceso, registro, perfil, favoritos y colecciones."""
 
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.views import LoginView
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from catalogo.models import Producto
+from core.permisos import es_administrador
 
 from .forms import ColeccionForm, PerfilForm, RegistroForm
 from .models import Coleccion, Favorito, Perfil
+
+
+class AccesoView(LoginView):
+    """Acceso único para administradores y clientes.
+
+    La redirección se decide según los permisos reales del usuario, nunca por
+    su nombre: los administradores van al panel de ATELIER y los clientes a la
+    experiencia web normal.
+    """
+
+    template_name = 'cuentas/login.html'
+    redirect_authenticated_user = True
+
+    def get_success_url(self):
+        if es_administrador(self.request.user):
+            return reverse('panel:inicio')
+        destino = self.get_redirect_url()
+        if destino and (
+            destino.startswith(reverse('panel:inicio')) or destino.startswith('/admin/')
+        ):
+            destino = None
+        return destino or reverse('core:inicio')
 
 
 def registro(request):

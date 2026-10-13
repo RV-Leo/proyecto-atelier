@@ -28,8 +28,14 @@
           <li><a href="{% url 'catalogo:lista' %}" class="{% if request.resolver_match.view_name == 'catalogo:lista' or request.resolver_match.view_name == 'catalogo:detalle' %}activo{% endif %}">Catálogo</a></li>
           <li><a href="{% url 'tendencias:lista' %}" class="{% if request.resolver_match.view_name == 'tendencias:lista' %}activo{% endif %}">Tendencias</a></li>
           <li><a href="{% url 'disenador:asistente' %}" class="{% if request.resolver_match.view_name == 'disenador:asistente' %}activo{% endif %}">Diseñador IA</a></li>
-          <li><a href="{% url 'catalogo:inventario' %}" class="{% if request.resolver_match.view_name == 'catalogo:inventario' %}activo{% endif %}">Inventario</a></li>
-          <li><a href="{% url 'core:inicio' %}#accesos" class="{% if request.resolver_match.view_name == 'informes:informes' %}activo{% endif %}">Informes</a></li>
+          {% if user.is_authenticated %}
+            {% if es_administrador %}
+              <li><a href="{% url 'panel:inicio' %}" class="{% if request.resolver_match.app_name == 'panel' %}activo{% endif %}">Panel</a></li>
+              <li><a href="{% url 'informes:informes' %}" class="{% if request.resolver_match.view_name == 'informes:informes' %}activo{% endif %}">Informes</a></li>
+            {% else %}
+              <li><a href="{% url 'catalogo:inventario' %}" class="{% if request.resolver_match.view_name == 'catalogo:inventario' %}activo{% endif %}">Inventario</a></li>
+            {% endif %}
+          {% endif %}
         </ul>
 
         <form class="buscador-cabecera" action="{% url 'catalogo:lista' %}" method="get" role="search">
@@ -39,10 +45,14 @@
 
         <div class="accesos-cuenta">
           {% if user.is_authenticated %}
-            <a class="btn btn-ghost btn-compacto" href="{% url 'cuentas:perfil' %}">Mi perfil</a>
+            {% if es_administrador %}
+              <a class="btn btn-ghost btn-compacto" href="{% url 'panel:inicio' %}">Panel</a>
+            {% else %}
+              <a class="btn btn-ghost btn-compacto" href="{% url 'cuentas:perfil' %}">Mi perfil</a>
+            {% endif %}
             <form action="{% url 'cuentas:salir' %}" method="post">
               {% csrf_token %}
-              <button class="btn btn-suave btn-compacto" type="submit">Salir</button>
+              <button class="btn btn-suave btn-compacto" type="submit">Cerrar sesión</button>
             </form>
           {% else %}
             <a class="btn btn-ghost btn-compacto" href="{% url 'cuentas:acceder' %}">Acceder</a>
@@ -90,14 +100,19 @@
           <h4>Tu cuenta</h4>
           <ul>
             {% if user.is_authenticated %}
-              <li><a href="{% url 'cuentas:perfil' %}">Mi perfil</a></li>
-              <li><a href="{% url 'disenador:historial' %}">Mis propuestas</a></li>
+              {% if es_administrador %}
+                <li><a href="{% url 'panel:inicio' %}">Panel administrativo</a></li>
+                <li><a href="{% url 'informes:informes' %}">Informes</a></li>
+                <li><a href="{% url 'admin:index' %}">Django Admin</a></li>
+              {% else %}
+                <li><a href="{% url 'cuentas:perfil' %}">Mi perfil</a></li>
+                <li><a href="{% url 'disenador:historial' %}">Mis propuestas</a></li>
+                <li><a href="{% url 'catalogo:inventario' %}">Inventario</a></li>
+              {% endif %}
             {% else %}
               <li><a href="{% url 'cuentas:acceder' %}">Acceder</a></li>
               <li><a href="{% url 'cuentas:registro' %}">Crear cuenta</a></li>
             {% endif %}
-            <li><a href="{% url 'informes:informes' %}">Informes</a></li>
-            <li><a href="{% url 'admin:index' %}">Administración</a></li>
           </ul>
         </div>
       </div>

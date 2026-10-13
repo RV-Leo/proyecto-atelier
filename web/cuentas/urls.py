@@ -8,7 +8,7 @@ from . import views
 app_name = 'cuentas'
 
 urlpatterns = [
-    path('acceder/', auth_views.LoginView.as_view(template_name='cuentas/login.html'), name='acceder'),
+    path('acceder/', views.AccesoView.as_view(), name='acceder'),
     path('salir/', auth_views.LogoutView.as_view(), name='salir'),
     path('registro/', views.registro, name='registro'),
     path('perfil/', views.perfil, name='perfil'),
