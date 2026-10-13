@@ -13,6 +13,20 @@
         </div>
       </div>
 
+      {% if not user.is_authenticated %}
+        <div class="acceso-aviso amplio">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.6 4.6 1.9-4.6 1.9L12 16l-1.9-4.6-4.6-1.9 4.6-1.9L12 3z"/><path d="M19 14l.9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9L19 14z"/></svg>
+          <div>
+            <strong>Tu próximo diseño empieza aquí.</strong>
+            Inicia sesión o crea tu cuenta para guardar tus ideas, crear colecciones y personalizar tu experiencia en ATELIER.
+            <div class="acceso-aviso-acciones">
+              <a class="btn btn-primario btn-compacto" href="{% url 'cuentas:acceder' %}?next={{ request.path|urlencode }}">Iniciar sesión</a>
+              <a class="btn btn-ghost btn-compacto" href="{% url 'cuentas:registro' %}?next={{ request.path|urlencode }}">Crear cuenta</a>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
       <div class="nota-demo" style="margin-bottom:1.6rem">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
         <div>
