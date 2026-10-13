@@ -8,6 +8,25 @@ Además, hace de **puente de IA**: habla con el servidor de modelos (Qwen) para
 redactar el comentario de viabilidad y generar las propuestas de diseño. Ver
 [Puente de IA](#puente-de-ia).
 
+## Decisión de integración: la web consume esta API
+
+El equipo decidió que la web de Django **consume esta API al 100%** para todo
+dato de negocio: materiales, prendas, viabilidad, tendencias y diseño. Django
+conserva sus propias tablas solo para lo que es suyo (usuarios, sesiones,
+perfiles y colecciones).
+
+Lo que eso implica del lado del backend:
+
+- La API es la **única** fuente de verdad del inventario y el catálogo. Django
+  no vuelve a leer `material` ni `prenda` de la base de datos.
+- Los listados **pagina** con un envoltorio que calca el paginador de Django, y
+  los filtros de la web (`q`, `estado`, `tipo`, `estilo`) existen como
+  parámetros de consulta.
+- Cada prenda lleva un **slug**, porque la web la enlaza por slug y no por id.
+
+Aun así, **ninguna de estas tablas es de Django**: si mañana la web se sustituye,
+la API y el esquema no cambian.
+
 ## Requisitos
 
 - Java 21
@@ -16,7 +35,7 @@ redactar el comentario de viabilidad y generar las propuestas de diseño. Ver
 
 ## Configuración de la base de datos
 
-Crear el rol y la base de datos una sola vez:
+Crear el rol y la base de datos una sola vez (solo para Postgres local):
 
 ```sql
 CREATE ROLE atelier WITH LOGIN PASSWORD '<tu-password>';
@@ -31,9 +50,53 @@ Las credenciales **no** se suben al repositorio. Hay dos formas:
 
 | Variable | Descripción | Ejemplo |
 | --- | --- | --- |
-| `DB_URL` | JDBC URL | `jdbc:postgresql://localhost:5432/atelier` |
-| `DB_USER` | Usuario de PostgreSQL | `atelier` |
-| `DB_PASSWORD` | Contraseña | `secret` |
+| `POSTGRES_URL` | JDBC URL | `jdbc:postgresql://localhost:5432/atelier` |
+| `POSTGRES_USER` | Usuario de PostgreSQL | `atelier` |
+| `POSTGRES_PASSWORD` | Contraseña | `secret` |
+
+### Supabase
+
+El proyecto usa **Supabase** como PostgreSQL administrado. La conexión se
+configura con las mismas tres variables; solo cambian sus valores.
+
+Supabase ofrece tres formas de conectarse y **no son intercambiables**:
+
+| Modo | Host : Puerto | Usuario | Útil para |
+| --- | --- | --- | --- |
+| Directo | `db.<ref>.supabase.co` : **5432** | `postgres` | Flyway, backends largos. **IPv6** en plan gratis |
+| Pooler session | `aws-0-<region>.pooler.supabase.com` : **5432** | `postgres.<ref>` | Backends en redes IPv4 |
+| Pooler transaction | `aws-0-<region>.pooler.supabase.com` : **6543** | `postgres.<ref>` | Serverless — **no usar aquí** |
+
+**Reglas:**
+
+1. **Usar siempre el puerto 5432.** El 6543 (transaction mode) no soporta
+   *prepared statements*, que son justo lo que usa Hibernate. Falla con
+   errores crípticos de sintaxis en las queries. El propio Supabase recomienda
+   5432 para Spring Boot.
+2. **Añadir `sslmode=require` a la URL a mano.** El driver JDBC por defecto usa
+   `prefer` y, si SSL falla, **silenciosamente** sigue en texto plano.
+3. **Flyway necesita session mode o conexión directa**, porque las migraciones
+   usan *advisory locks*. Con 6543 las migraciones pueden quedarse a medias.
+
+Ejemplo con pooler session (IPv4, funciona en cualquier red):
+
+```bash
+export POSTGRES_URL='jdbc:postgresql://aws-0-ap-northeast-1.pooler.supabase.com:5432/postgres?sslmode=require'
+export POSTGRES_USER='postgres.abcdefghijklmnopqrst'
+export POSTGRES_PASSWORD='<tu-password-de-supabase>'
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+```
+
+> Las comillas simples del `export` importan: sin ellas la shell se traga los
+> `&` de la URL y lanza el comando en segundo plano.
+
+La contraseña se toma del dashboard de Supabase → **Connect** → **Database** →
+**Session pooler** → pestaña **JDBC**. Cualquier carácter reservado de la
+contraseña (`&`, `#`, `?`, espacio`) debe ir codificado como `%26`, `%23`,
+`%3F` o `%20`.
+
+Si la base de datos está vacía, el esquema se crea solo al arrancar: Flyway
+aplica `V1`…`V4` contra Supabase igual que contra Postgres local.
 
 ## Ejecutar
 
@@ -41,10 +104,10 @@ Las credenciales **no** se suben al repositorio. Hay dos formas:
 # Perfil local (lee application-local.properties)
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 
-# O con variables de entorno
-export DB_URL=jdbc:postgresql://localhost:5432/atelier
-export DB_USER=atelier
-export DB_PASSWORD=secret
+# O con variables de entorno (local)
+export POSTGRES_URL=jdbc:postgresql://localhost:5432/atelier
+export POSTGRES_USER=atelier
+export POSTGRES_PASSWORD=secret
 ./mvnw spring-boot:run
 ```
 
@@ -61,6 +124,7 @@ archivos SQL en `src/main/resources/db/migration/`:
 | `V2__tendencias.sql` | `tendencia` |
 | `V3__inventario_viabilidad.sql` | `material`, `prenda_material`, `analisis_viabilidad`, `alternativa_stock` |
 | `V4__mayusculas_enums.sql` | Ajusta los `CHECK` de enums a mayúsculas |
+| `V5__prenda_slug.sql` | Añade `prenda.slug`, con índice único |
 
 Al arrancar, Spring Boot aplica las migraciones pendientes automáticamente
 (`spring.flyway.enabled=true`).
@@ -103,12 +167,25 @@ Base: `/api/v1`
 
 | Método | Ruta | Descripción |
 | --- | --- | --- |
-| GET | `/materiales` | Lista todos los materiales |
+| GET | `/materiales` | Lista el inventario, con filtros y paginación opcionales |
 | GET | `/materiales/activos` | Lista solo los activos |
 | GET | `/materiales/{id}` | Detalle de un material |
 | POST | `/materiales` | Crea un material |
 | PUT | `/materiales/{id}` | Actualiza un material |
 | DELETE | `/materiales/{id}` | Elimina un material |
+
+Parámetros de `GET /materiales`:
+
+| Parámetro | Descripción |
+| --- | --- |
+| `q` | Búsqueda libre en nombre, tipo y color |
+| `estado` | `AGOTADO`, `BAJO` o `DISPONIBLE` |
+| `activo` | `true` / `false` |
+| `pagina` | Número de página, **base 1** (como en Django) |
+| `tamano` | Tamaño de página. Por defecto 20, máximo 100 |
+
+`estado` se calcula con la misma regla que ya usaba la web: `AGOTADO` si
+`stock <= 0`, `BAJO` si `0 < stock <= stockMinimo`, `DISPONIBLE` en el resto.
 
 Ejemplo:
 
@@ -134,13 +211,45 @@ curl -u user:tu-password -X POST http://localhost:8080/api/v1/materiales \
 
 | Método | Ruta | Descripción |
 | --- | --- | --- |
-| GET | `/prendas` | Lista las prendas |
+| GET | `/prendas` | Lista las prendas, con filtros y paginación opcionales |
+| GET | `/prendas/slug/{slug}` | Detalle por slug, como lo abre la web |
 | GET | `/prendas/{id}` | Detalle de una prenda |
 | POST | `/prendas` | Crea una prenda (estado inicial `BORRADOR`) |
 | GET | `/prendas/{id}/materiales` | Ficha técnica con stock disponible |
 | POST | `/prendas/{id}/materiales` | Asigna un material a la prenda |
 
+Parámetros de `GET /prendas`: `q` (nombre o descripción), `tipo`, `estilo`,
+`estado`, `pagina`, `tamano`.
+
+`slug` se genera solo a partir del nombre (`"Vestido de verano"` →
+`vestido-de-verano`). Si dos prendas se llaman igual, la segunda recibe el
+sufijo `-2`. La web enlaza cada prenda por su slug, no por su id.
+
 `estado` acepta: `BORRADOR`, `GENERANDO`, `GENERADA`, `ANALIZADA`.
+
+### Paginación
+
+`/materiales`, `/prendas` y `/tendencias` devuelven un envoltorio común:
+
+```json
+{
+  "items": [ { "...": "..." } ],
+  "pagina": 1,
+  "tamano": 20,
+  "total": 118,
+  "totalPaginas": 6,
+  "primera": true,
+  "ultima": false
+}
+```
+
+Los nombres calcan el paginador de Django (`count`, `num_pages`, `page.number`)
+a propósito, para que la vista no tenga que traducir nada.
+
+**La paginación es opcional.** Si no se mandan `pagina` ni `tamano`, se devuelve
+todo en una sola página (`totalPaginas: 1`). Así el catálogo pagina a 12 por
+página mientras el inventario y los informes siguen recibiendo la lista
+completa.
 
 ### Viabilidad
 
@@ -184,9 +293,11 @@ puede producir" es una respuesta válida, no un error.
 
 | Método | Ruta | Descripción |
 | --- | --- | --- |
-| GET | `/tendencias` | Lista las tendencias |
+| GET | `/tendencias` | Lista las tendencias, con paginación opcional |
 | GET | `/tendencias/region/{region}` | Filtra por región |
 | POST | `/tendencias` | Registra una tendencia capturada |
+
+Ambos `GET` aceptan `pagina` y `tamano`.
 
 `region` acepta: `EUROPA`, `AMERICA`, `GLOBAL`.
 `fuente` acepta: `PINTEREST`, `TIENDA_MARCA`, `OTRO`.

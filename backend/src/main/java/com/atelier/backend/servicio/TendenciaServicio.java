@@ -2,10 +2,12 @@ package com.atelier.backend.servicio;
 
 import java.util.List;
 
+import org.springframework.data.domain.Sort;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.atelier.backend.api.dto.PaginaResponse;
 import com.atelier.backend.api.dto.TendenciaRequest;
 import com.atelier.backend.api.dto.TendenciaResponse;
 import com.atelier.backend.dominio.Tendencia;
@@ -28,15 +30,33 @@ public class TendenciaServicio {
     }
 
     @Transactional(readOnly = true)
-    public List<TendenciaResponse> listar() {
-        return tendencias.findAll().stream().map(TendenciaResponse::desde).toList();
+    public PaginaResponse<TendenciaResponse> listar(Integer pagina, Integer tamano) {
+        if (pagina == null) {
+            return PaginaResponse.completa(
+                    tendencias.findAll(Sort.by("capturadoEn").descending())
+                            .stream()
+                            .map(TendenciaResponse::desde)
+                            .toList());
+        }
+        return PaginaResponse.desde(tendencias
+                .findAll(PaginaResponse.aPageable(pagina, tamano, Sort.by("capturadoEn").descending()))
+                .map(TendenciaResponse::desde));
     }
 
     @Transactional(readOnly = true)
-    public List<TendenciaResponse> porRegion(com.atelier.backend.dominio.Region region) {
-        return tendencias.findByRegionOrderByCapturadoEnDesc(region).stream()
-                .map(TendenciaResponse::desde)
-                .toList();
+    public PaginaResponse<TendenciaResponse> porRegion(
+            com.atelier.backend.dominio.Region region, Integer pagina, Integer tamano) {
+        if (pagina == null) {
+            return PaginaResponse.completa(
+                    tendencias.findByRegionOrderByCapturadoEnDesc(region)
+                            .stream()
+                            .map(TendenciaResponse::desde)
+                            .toList());
+        }
+        return PaginaResponse.desde(tendencias
+                .findByRegion(region, PaginaResponse.aPageable(
+                        pagina, tamano, Sort.by("capturadoEn").descending()))
+                .map(TendenciaResponse::desde));
     }
 
     public TendenciaResponse crear(TendenciaRequest datos) {

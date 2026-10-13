@@ -1,7 +1,6 @@
 package com.atelier.backend.api;
 
 import java.net.URI;
-import java.util.List;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -11,10 +10,13 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.atelier.backend.api.dto.MaterialRequest;
 import com.atelier.backend.api.dto.MaterialResponse;
+import com.atelier.backend.api.dto.PaginaResponse;
+import com.atelier.backend.dominio.EstadoMaterial;
 import com.atelier.backend.servicio.MaterialServicio;
 
 import jakarta.validation.Valid;
@@ -36,14 +38,28 @@ public class MaterialController {
         this.servicio = servicio;
     }
 
+    /**
+     * Lista el inventario.
+     *
+     * <p>Los filtros y la paginación son opcionales: sin {@code pagina} se
+     * devuelve todo, para las vistas que cargan el inventario entero. La web
+     * pagina a 12 por página en el catálogo.
+     */
     @GetMapping
-    public List<MaterialResponse> listar() {
-        return servicio.listar();
+    public PaginaResponse<MaterialResponse> listar(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) EstadoMaterial estado,
+            @RequestParam(required = false) Boolean activo,
+            @RequestParam(required = false) Integer pagina,
+            @RequestParam(required = false) Integer tamano) {
+        return servicio.listar(q, estado, activo, pagina, tamano);
     }
 
     @GetMapping("/activos")
-    public List<MaterialResponse> listarActivos() {
-        return servicio.listarActivos();
+    public PaginaResponse<MaterialResponse> listarActivos(
+            @RequestParam(required = false) Integer pagina,
+            @RequestParam(required = false) Integer tamano) {
+        return servicio.listarActivos(pagina, tamano);
     }
 
     @GetMapping("/{id}")

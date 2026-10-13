@@ -9,6 +9,7 @@ import com.atelier.backend.dominio.Prenda;
 public record PrendaResponse(
         Long id,
         String nombre,
+        String slug,
         String tipoPrenda,
         String estilo,
         String colores,
@@ -22,6 +23,7 @@ public record PrendaResponse(
         return new PrendaResponse(
                 p.getId(),
                 p.getNombre(),
+                p.getSlug(),
                 p.getTipoPrenda(),
                 p.getEstilo(),
                 p.getColores(),

@@ -1,17 +1,25 @@
 package com.atelier.backend.servicio;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.atelier.backend.api.dto.MaterialRequest;
 import com.atelier.backend.api.dto.MaterialResponse;
+import com.atelier.backend.api.dto.PaginaResponse;
+import com.atelier.backend.dominio.EstadoMaterial;
 import com.atelier.backend.dominio.Material;
 import com.atelier.backend.repositorio.MaterialRepository;
 
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Predicate;
 
 /**
  * Inventario de materiales.
@@ -30,13 +38,69 @@ public class MaterialServicio {
     }
 
     @Transactional(readOnly = true)
-    public List<MaterialResponse> listar() {
-        return materiales.findAll().stream().map(MaterialResponse::desde).toList();
+    public PaginaResponse<MaterialResponse> listar(
+            String q, EstadoMaterial estado, Boolean activo, Integer pagina, Integer tamano) {
+        Specification<Material> filtros = conFiltros(q, estado, activo);
+
+        // Sin parámetros de paginación se devuelve todo, para las vistas que hoy
+        // cargan el inventario completo (inventario y panel de la web).
+        if (pagina == null) {
+            List<MaterialResponse> todos = materiales.findAll(filtros, Sort.by("nombre"))
+                    .stream()
+                    .map(MaterialResponse::desde)
+                    .toList();
+            return PaginaResponse.completa(todos);
+        }
+
+        return PaginaResponse.desde(
+                materiales.findAll(filtros, PaginaResponse.aPageable(pagina, tamano))
+                        .map(MaterialResponse::desde));
     }
 
     @Transactional(readOnly = true)
-    public List<MaterialResponse> listarActivos() {
-        return materiales.findByActivoTrue().stream().map(MaterialResponse::desde).toList();
+    public PaginaResponse<MaterialResponse> listarActivos(Integer pagina, Integer tamano) {
+        return listar(null, null, true, pagina, tamano);
+    }
+
+    /**
+     * Combina los filtros opcionales.
+     *
+     * <p>La búsqueda libre cubre nombre, tipo y color, que son los campos que la
+     * web dejaba filtrar en su inventario.
+     */
+    private Specification<Material> conFiltros(String q, EstadoMaterial estado, Boolean activo) {
+        return (root, query, cb) -> {
+            List<Predicate> condiciones = new ArrayList<>();
+
+            if (q != null && !q.isBlank()) {
+                String patron = "%" + q.trim().toLowerCase(Locale.ROOT) + "%";
+                condiciones.add(cb.or(
+                        cb.like(cb.lower(root.get("nombre")), patron),
+                        cb.like(cb.lower(root.get("tipo")), patron),
+                        cb.like(cb.lower(root.get("color")), patron)));
+            }
+
+            if (activo != null) {
+                condiciones.add(cb.equal(root.get("activo"), activo));
+            }
+
+            if (estado != null) {
+                Path<BigDecimal> stock = root.get("stock");
+                Path<BigDecimal> minimo = root.get("stockMinimo");
+                switch (estado) {
+                    // Los umbrales tienen que coincidir con EstadoMaterial.de, si no
+                    // el filtro devolveria materiales cuyo estado calculado es otro.
+                    case AGOTADO -> condiciones.add(
+                            cb.lessThanOrEqualTo(stock, BigDecimal.ZERO));
+                    case BAJO -> condiciones.add(cb.and(
+                            cb.greaterThan(stock, BigDecimal.ZERO),
+                            cb.lessThanOrEqualTo(stock, minimo)));
+                    case DISPONIBLE -> condiciones.add(cb.greaterThan(stock, minimo));
+                }
+            }
+
+            return cb.and(condiciones.toArray(new Predicate[0]));
+        };
     }
 
     @Transactional(readOnly = true)

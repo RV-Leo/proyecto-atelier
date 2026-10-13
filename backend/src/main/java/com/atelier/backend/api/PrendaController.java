@@ -9,12 +9,15 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.atelier.backend.api.dto.PaginaResponse;
 import com.atelier.backend.api.dto.PrendaMaterialRequest;
 import com.atelier.backend.api.dto.PrendaMaterialResponse;
 import com.atelier.backend.api.dto.PrendaRequest;
 import com.atelier.backend.api.dto.PrendaResponse;
+import com.atelier.backend.dominio.EstadoPrenda;
 import com.atelier.backend.servicio.PrendaServicio;
 
 import jakarta.validation.Valid;
@@ -36,9 +39,33 @@ public class PrendaController {
         this.servicio = servicio;
     }
 
+    /**
+     * Lista las prendas.
+     *
+     * <p>Filtros y paginación son opcionales: sin {@code pagina} se devuelve
+     * todo. El catálogo de la web pagina a 12 por página.
+     */
     @GetMapping
-    public List<PrendaResponse> listar() {
-        return servicio.listar();
+    public PaginaResponse<PrendaResponse> listar(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String tipo,
+            @RequestParam(required = false) String estilo,
+            @RequestParam(required = false) EstadoPrenda estado,
+            @RequestParam(required = false) Integer pagina,
+            @RequestParam(required = false) Integer tamano) {
+        return servicio.listar(q, tipo, estilo, estado, pagina, tamano);
+    }
+
+    /**
+     * Detalle por slug, que es como la web enlaza cada prenda
+     * ({@code /catalogo/<slug>/}).
+     *
+     * <p>Se declara antes que {@code /{id}} para que el tramo literal gane en la
+     * resolución de rutas.
+     */
+    @GetMapping("/slug/{slug}")
+    public PrendaResponse porSlug(@PathVariable String slug) {
+        return servicio.obtenerPorSlug(slug);
     }
 
     @GetMapping("/{id}")

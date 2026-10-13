@@ -1,11 +1,17 @@
 package com.atelier.backend.servicio;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.atelier.backend.api.dto.PaginaResponse;
 import com.atelier.backend.api.dto.PrendaMaterialRequest;
 import com.atelier.backend.api.dto.PrendaMaterialResponse;
 import com.atelier.backend.api.dto.PrendaRequest;
@@ -14,11 +20,13 @@ import com.atelier.backend.dominio.EstadoPrenda;
 import com.atelier.backend.dominio.Material;
 import com.atelier.backend.dominio.Prenda;
 import com.atelier.backend.dominio.PrendaMaterial;
+import com.atelier.backend.dominio.Slug;
 import com.atelier.backend.repositorio.MaterialRepository;
 import com.atelier.backend.repositorio.PrendaMaterialRepository;
 import com.atelier.backend.repositorio.PrendaRepository;
 
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.persistence.criteria.Predicate;
 
 /**
  * Prendas del módulo de diseño generativo.
@@ -46,8 +54,52 @@ public class PrendaServicio {
     }
 
     @Transactional(readOnly = true)
-    public List<PrendaResponse> listar() {
-        return prendas.findAll().stream().map(PrendaResponse::desde).toList();
+    public PaginaResponse<PrendaResponse> listar(
+            String q, String tipo, String estilo, EstadoPrenda estado,
+            Integer pagina, Integer tamano) {
+        Specification<Prenda> filtros = conFiltros(q, tipo, estilo, estado);
+
+        if (pagina == null) {
+            List<PrendaResponse> todas = prendas.findAll(filtros, Sort.by("creadoEn").descending())
+                    .stream()
+                    .map(PrendaResponse::desde)
+                    .toList();
+            return PaginaResponse.completa(todas);
+        }
+
+        // Las prendas más recientes primero, que es como las lista el catálogo.
+        Pageable pageable = PaginaResponse.aPageable(
+                pagina, tamano, Sort.by("creadoEn").descending());
+        return PaginaResponse.desde(prendas.findAll(filtros, pageable).map(PrendaResponse::desde));
+    }
+
+    /** Mismos filtros que la web aplica en su catálogo. */
+    private Specification<Prenda> conFiltros(
+            String q, String tipo, String estilo, EstadoPrenda estado) {
+        return (root, query, cb) -> {
+            List<Predicate> condiciones = new ArrayList<>();
+
+            if (q != null && !q.isBlank()) {
+                String patron = "%" + q.trim().toLowerCase(Locale.ROOT) + "%";
+                condiciones.add(cb.or(
+                        cb.like(cb.lower(root.get("nombre")), patron),
+                        cb.like(cb.lower(root.get("descripcion")), patron)));
+            }
+
+            if (tipo != null && !tipo.isBlank()) {
+                condiciones.add(cb.equal(cb.lower(root.get("tipoPrenda")), tipo.toLowerCase(Locale.ROOT)));
+            }
+
+            if (estilo != null && !estilo.isBlank()) {
+                condiciones.add(cb.equal(cb.lower(root.get("estilo")), estilo.toLowerCase(Locale.ROOT)));
+            }
+
+            if (estado != null) {
+                condiciones.add(cb.equal(root.get("estado"), estado));
+            }
+
+            return cb.and(condiciones.toArray(new Predicate[0]));
+        };
     }
 
     @Transactional(readOnly = true)
@@ -55,9 +107,17 @@ public class PrendaServicio {
         return PrendaResponse.desde(obtenerEntidad(id));
     }
 
+    /** Búsqueda por slug, que es como la web abre el detalle de una prenda. */
+    @Transactional(readOnly = true)
+    public PrendaResponse obtenerPorSlug(String slug) {
+        return PrendaResponse.desde(prendas.findBySlug(slug)
+                .orElseThrow(() -> new EntityNotFoundException("No existe la prenda " + slug)));
+    }
+
     public PrendaResponse crear(PrendaRequest datos) {
         Prenda prenda = new Prenda();
         prenda.setNombre(datos.nombre());
+        prenda.setSlug(slugUnico(datos.nombre(), null));
         prenda.setTipoPrenda(datos.tipoPrenda());
         prenda.setEstilo(datos.estilo());
         prenda.setColores(datos.colores());
@@ -129,6 +189,28 @@ public class PrendaServicio {
                 requerido,
                 material.getStock(),
                 material.getStock().compareTo(requerido) >= 0);
+    }
+
+    /**
+     * Genera un slug no repetido.
+     *
+     * <p>Dos prendas pueden llamarse igual, así que al segundo se le añade un
+     * sufijo numérico. Si se está editando la propia prenda, su slug actual no
+     * cuenta como ocupado.
+     */
+    private String slugUnico(String nombre, Long propioId) {
+        String base = Slug.de(nombre);
+        if (base.isBlank()) {
+            base = "prenda";
+        }
+        String candidato = base;
+        int sufijo = 2;
+        while (prendas.findBySlug(candidato)
+                .filter(p -> propioId == null || !p.getId().equals(propioId))
+                .isPresent()) {
+            candidato = base + "-" + sufijo++;
+        }
+        return candidato;
     }
 
     private Prenda obtenerEntidad(Long id) {

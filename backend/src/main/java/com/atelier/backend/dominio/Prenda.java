@@ -30,6 +30,15 @@ public class Prenda {
     @Column(nullable = false, length = 120)
     private String nombre;
 
+    /**
+     * Identificador legible para la URL de la web ({@code /catalogo/<slug>/}).
+     *
+     * <p>Django localiza el producto por slug y no por id, así que la prenda
+     * necesita el suyo propio. Se genera a partir del nombre.
+     */
+    @Column(length = 140, unique = true)
+    private String slug;
+
     @Column(name = "tipo_prenda", nullable = false, length = 40)
     private String tipoPrenda;
 
@@ -83,6 +92,14 @@ public class Prenda {
 
     public void setNombre(String nombre) {
         this.nombre = nombre;
+    }
+
+    public String getSlug() {
+        return slug;
+    }
+
+    public void setSlug(String slug) {
+        this.slug = slug;
     }
 
     public String getTipoPrenda() {

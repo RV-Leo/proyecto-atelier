@@ -71,7 +71,7 @@ class ApiFlujoTests {
         // No se compara el total: la base puede tener datos de otros usos.
         mockMvc.perform(get("/api/v1/materiales").with(httpBasic(usuario, clave)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].nombre", hasItem("Algodon peinado")));
+                .andExpect(jsonPath("$.items[*].nombre", hasItem("Algodon peinado")));
     }
 
     @Test
