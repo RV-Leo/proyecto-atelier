@@ -1,84 +1,150 @@
-# backend — API REST y puente de IA
+# proyecto-atelier — Backend
 
-API REST del proyecto Atelier construida con Spring Boot. Es el punto único de
-acceso a los datos: la web (Django) y la app móvil consumen esta API en lugar de
-conectarse directamente a la base de datos.
+## Rama actual: `feature/backend-api-inventario`
 
-Además, hace de **puente de IA**: habla con el servidor de modelos (Qwen) para
-redactar el comentario de viabilidad y generar las propuestas de diseño. Ver
-[Puente de IA](#puente-de-ia).
+El historial local tiene 5 commits:
 
-## Decisión de integración: la web consume esta API
+1. **`51bf3f0`** — backend: API REST inicial con Spring Boot, seguridad y PostgreSQL
+2. **`8c064a9`** — backend: esquema de base de datos con Flyway (7 tablas, 3 módulos)
+3. **`1f26a8a`** — backend: API REST de inventario, prendas, viabilidad y tendencias
+4. **`5051a51`** — backend: puente de IA para diseño y narración de viabilidad
+5. **`014a7a0`** — backend: paginación, filtros y slug para que la web consuma la API
 
-El equipo decidió que la web de Django **consume esta API al 100%** para todo
-dato de negocio: materiales, prendas, viabilidad, tendencias y diseño. Django
-conserva sus propias tablas solo para lo que es suyo (usuarios, sesiones,
-perfiles y colecciones).
+---
 
-Lo que eso implica del lado del backend:
+## 1. ¿Qué hay este commit?
 
-- La API es la **única** fuente de verdad del inventario y el catálogo. Django
-  no vuelve a leer `material` ni `prenda` de la base de datos.
-- Los listados **pagina** con un envoltorio que calca el paginador de Django, y
-  los filtros de la web (`q`, `estado`, `tipo`, `estilo`) existen como
-  parámetros de consulta.
-- Cada prenda lleva un **slug**, porque la web la enlaza por slug y no por id.
+### API REST + Puente de IA
 
-Aun así, **ninguna de estas tablas es de Django**: si mañana la web se sustituye,
-la API y el esquema no cambian.
+El backend cumple los dos roles que pide el README:
 
-## Requisitos
+- **API REST**: CRUD materiales, prendas, viabilidad, tendencias, diseño.
+- **Puente de IA**: hace de intermediario entre el backend y los modelos Qwen, según `docs/modelos-ia.md` pasos 4-5. La API **decide** stock/viabilidad determinísticamente; el modelo solo **narra**.
 
-- Java 21
-- Maven 3.9+ (o usar el wrapper: `./mvnw`)
-- PostgreSQL 14+ corriendo en `localhost:5432`
+#### Endpoints principales (base `/api/v1`)
 
-## Configuración de la base de datos
+| Recurso | Métodos | Notas |
+|---|---|---|
+| `materiales` | GET/POST/PUT/DELETE | Filtros: `q`, `estado`, `activo`. Paginación opcional |
+| `prendas` | GET/POST + `/materiales` | Slug nuevo (`/prendas/slug/{slug}`) |
+| `viabilidad/{prendaId}` | POST | Stock real vs. ficha técnica. `viable: false` es 200, no error |
+| `tendencias` | GET/POST + `/region/{region}` | Paginación opcional |
+| `diseno/prompt` | GET | `fuente: MODELO` o `PLANTILLA` |
+| `diseno/propuestas` | POST|GET | 503 si la IA no está |
+| `diseno/propuestas/{id}/seleccion` | PUT | Marca la elegida |
 
-Crear el rol y la base de datos una sola vez (solo para Postgres local):
+#### Puente de IA (detalle)
 
-```sql
-CREATE ROLE atelier WITH LOGIN PASSWORD '<tu-password>';
-CREATE DATABASE atelier OWNER atelier ENCODING 'UTF8';
-```
+- `ClienteIa` (interfaz) → `ClienteIaHttp` (cliente HTTP) o `ClienteIaNoDisponible` (fallback).
+- `ConfigIa` selecciona el cliente según `propiedades.habilitada()`, no `@ConditionalOnProperty`.
+- Si `atelier.ia.url` está vacío (por defecto): IA fuera, API funciona igual con plantilla.
+- Si la URL tiene valor: se llama al modelo, se guarda el comentario y las imágenes.
+- `GuardadorImagenes` escribe PNG en disco bajo `atelier.ia.directorio-imagenes`, servible en `/imagenes/**` **sin autenticación** (crucial: un `<img>` no puede mandar Basic Auth).
+- `IaNoDisponibleException` → HTTP 503.
 
-Las credenciales **no** se suben al repositorio. Hay dos formas:
+#### Configuración (variables de entorno)
 
-- **Local (recomendada para desarrollo):** copiar `application-local.properties`
-  con tus credenciales reales. Ese archivo está en `.gitignore`.
-- **Producción / CI:** definir variables de entorno.
+| Variable | Por defecto | Descripción |
+|---|---|---|
+| `POSTGRES_URL` | `jdbc:postgresql://127.0.0.1:5432/atelier` | JDBC URL. Supabase usa `sslmode=require` a mano. |
+| `POSTGRES_USER` | `atelier` | Usuario. |
+| `POSTGRES_PASSWORD` | (vacío) | Contraseña. |
+| `IA_URL` | *(vacío)* | URL base del servidor compatible con OpenAI. Vacío = IA fuera. |
+| `IA_API_KEY` | (vacío) | Bearer opcional. |
+| `IA_MODELO_TEXTO` | `Qwen3.6-35B-A3B` | Modelo para chat (prompt, comentario viabilidad). |
+| `IA_MODELO_IMAGEN` | `Qwen-Image` | Modelo para imágenes. |
+| `IA_TIMEOUT_SEGUNDOS` | `120` | Límite de espera. `<= 0` = sin límite. |
+| `IA_DIRECTORIO_IMAGENES` | `imagenes-diseno` | Donde se guardan los PNG. |
 
-| Variable | Descripción | Ejemplo |
-| --- | --- | --- |
-| `POSTGRES_URL` | JDBC URL | `jdbc:postgresql://localhost:5432/atelier` |
-| `POSTGRES_USER` | Usuario de PostgreSQL | `atelier` |
-| `POSTGRES_PASSWORD` | Contraseña | `secret` |
+#### Migraciones (Flyway)
 
-### Supabase
+- 5 archivos `V1`..`V5__*.sql` en `src/main/resources/db/migration/`.
+- `spring.jpa.hibernate.ddl-auto=validate`: Hibernate **nunca** altera el esquema.
+- `spring.flyway.schemas=public`: fija el esquema para que coincida local/Supabase.
+- **Regla**: si cambias una entidad, crea una migración nueva. No edites una que ya corrió.
 
-El proyecto usa **Supabase** como PostgreSQL administrado. La conexión se
-configura con las mismas tres variables; solo cambian sus valores.
+#### Autenticación
 
-Supabase ofrece tres formas de conectarse y **no son intercambiables**:
+- HTTP Basic en **todos** los endpoints, **menos** `/actuator/health` e `/actuator/info`.
+- `/imagenes/**` es **publico** (no hay Basic Auth), porque un `<img>` no puede mandar cabeceras.
+- Usuario por defecto: `atelier`, password: `atelier-dev` (en `application-local.properties`, `.gitignore`).
 
-| Modo | Host : Puerto | Usuario | Útil para |
-| --- | --- | --- | --- |
-| Directo | `db.<ref>.supabase.co` : **5432** | `postgres` | Flyway, backends largos. **IPv6** en plan gratis |
-| Pooler session | `aws-0-<region>.pooler.supabase.com` : **5432** | `postgres.<ref>` | Backends en redes IPv4 |
-| Pooler transaction | `aws-0-<region>.pooler.supabase.com` : **6543** | `postgres.<ref>` | Serverless — **no usar aquí** |
+#### Seguridad
 
-**Reglas:**
+- CSRF deshabilitado, sin sesiones (clientes puros de API).
+- Errores: `400` (validación), `401` (sin auth), `404` (no existe), `409` (unicidad URL tendencia), `503` (servidor IA caído).
 
-1. **Usar siempre el puerto 5432.** El 6543 (transaction mode) no soporta
-   *prepared statements*, que son justo lo que usa Hibernate. Falla con
-   errores crípticos de sintaxis en las queries. El propio Supabase recomienda
-   5432 para Spring Boot.
-2. **Añadir `sslmode=require` a la URL a mano.** El driver JDBC por defecto usa
-   `prefer` y, si SSL falla, **silenciosamente** sigue en texto plano.
-3. **Flyway necesita session mode o conexión directa**, porque las migraciones
-   usan *advisory locks*. Con 6543 las migraciones pueden quedarse a medias.
+#### Tests: 37 en verde
 
-Ejemplo con pooler session (IPv4, funciona en cualquier red):
+- `ApiFlujoTests` — 9 integración contra PostgreSQL real.
+- `PuenteIaTests` — 7 pruebas del estado sin IA (mock + infra).
+- `ClienteIaHttpTests` — 11 pruebas unitarias del cliente HTTP con `MockRestServiceServer`.
+- `ApiCatalogoTests` — 9 pruebas nuevas de paginación, filtros y slug.
+
+---
+
+## 2. Decisión de integración: la web consume la API (Opción A)
+
+### Contexto
+
+Se exploró la rama `origin/web`. El hallazgo central es contundente:
+
+**Django no consume ninguna API hoy.** No hay `serializers.py`, ni `rest_framework`, ni una sola llamada HTTP (`requests`/`httpx` ausentes). Todo se lee de **SQLite por ORM**.
+
+El gap es del **100 %** para todos los endpoints listados en el informe.
+
+### ¿Qué significa "Opción A"?
+
+La decisión tomada es que **Django consuma esta API al 100 %** para todo dato de negocio: materiales, prendas, viabilidad, tendencias y diseño. Django conserva sus propias tablas solo para lo que es suyo (usuarios, sesiones, perfiles y colecciones).
+
+### Lo que el backend cambió para que esto sea posible
+
+| Característica | Qué se hizo |
+|---|---|
+| **Paginación** | `PaginaResponse` con `items`, `pagina`, `tamano`, `total`, `totalPaginas`, `primera`, `ultima`. Sin parámetros = todo en una página. |
+| **Filtros** | `q` (búsqueda libre), `estado` (agotado/bajo/disponible en materiales; estado en prendas), `tipo`, `estilo`. Con `Specification`, no métodos derivados. |
+| **Estado del material** | Nuevo enum `EstadoMaterial` (AGOTADO, BAJO, DISPONIBLE). El cálculo vive en la API, no en Python. |
+| **Slug** | Campo `slug` en `Prenda`, índice único. Generado con `Slug.de` (replica `django.utils.text.slugify`). Endpoint `GET /prendas/slug/{slug}`. |
+| **Migración V5** | Añade `slug` a la tabla `prenda`, con datos de respaldo y índice único. |
+
+### ¿Qué falta todavía para que la web pueda consumirla?
+
+Esta lista depende de la rama `web`, pero aquí están las brechas que ya se empezaron a cubrir en el backend:
+
+| Necesidad en Django | Estado actual |
+|---|---|
+| Listados paginados (`q`, `pagina`, `tamano`) | API ya devuelve `PaginaResponse`. |
+| Filtros de materiales (`q`, `estado`) | API ya los tiene. |
+| Filtros de prendas (`q`, `tipo`, `estilo`) | API ya los tiene. |
+| Detalle por slug (`/catalogo/<slug>/`) | `GET /prendas/slug/{slug}` ya existe. |
+| Estado calculado del material | `EstadoMaterial` en el DTO. |
+| Agregados (`Sum(stock)`) para informes/panel | Pendiente — próxima mejora. |
+
+### Migración necesaria en Django
+
+- Añadir campo `slug` a `Producto` (o al modelo que corresponda).
+- Ajustar `get_absolute_url` para que use slug.
+- Añadir cliente HTTP (`requests`/`httpx`) que consuma los endpoints de esta API.
+- Migrar vistas que hoy leen `Material.objects.all()` etc. a consumir la API.
+
+**Decisión tomada:** se documenta aquí para que el equipo se ponga de acuerdo. Si en el futuro se decide la opción B o C, el backend ya tiene la base y no hay que desaprender nada.
+
+---
+
+## 3. Supabase (PostgreSQL gestionado)
+
+El proyecto está preparado para conectar contra Supabase. Los tres parámetros `POSTGRES_URL`/`POSTGRES_USER`/`POSTGRES_PASSWORD` ya están en `application.properties` y son sobreescribibles por variables de entorno.
+
+### Reglas críticas (no romper)
+
+| Regla | Por qué |
+|---|---|
+| **Usar siempre el puerto 5432** | El 6543 (transaction mode) no soporta *prepared statements*, que usa Hibernate. |
+| **Añadir `sslmode=require` a la URL** | El driver JDBC por defecto usa `prefer` y, si SSL falla, **silenciosamente** sigue en texto plano. |
+| **Flyway en session mode o directo** | Migraciones usan *advisory locks*; con 6543 pueden quedarse a medias. |
+| **Las comillas simples importan en `export`** | Sin ellas la shell se traga los `&` de la URL y lanza el comando en segundo plano. |
+
+### Ejemplo de configuración
 
 ```bash
 export POSTGRES_URL='jdbc:postgresql://aws-0-ap-northeast-1.pooler.supabase.com:5432/postgres?sslmode=require'
@@ -87,331 +153,33 @@ export POSTGRES_PASSWORD='<tu-password-de-supabase>'
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
-> Las comillas simples del `export` importan: sin ellas la shell se traga los
-> `&` de la URL y lanza el comando en segundo plano.
+### ¿Qué falta para verificar?
 
-La contraseña se toma del dashboard de Supabase → **Connect** → **Database** →
-**Session pooler** → pestaña **JDBC**. Cualquier carácter reservado de la
-contraseña (`&`, `#`, `?`, espacio`) debe ir codificado como `%26`, `%23`,
-`%3F` o `%20`.
+Necesito las credenciales (project ref + región + contraseña) para conectar de verdad y confirmar que Flyway y los 37 tests pasan contra Supabase. Si alguien las tiene, avísame y lo hago.
 
-Si la base de datos está vacía, el esquema se crea solo al arrancar: Flyway
-aplica `V1`…`V4` contra Supabase igual que contra Postgres local.
+---
 
-## Ejecutar
+## 4. Historial de cambios recientes
 
-```bash
-# Perfil local (lee application-local.properties)
-./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+| Commit | Descripción |
+|---|---|
+| `014a7a0` | Paginación, filtros y slug para que la web consuma la API |
+| `5051a51` | Puente de IA para diseño y narración de viabilidad |
+| `1f26a8a` | API REST de inventario, prendas, viabilidad y tendencias |
+| `8c064a9` | Esquema de base de datos con Flyway (7 tablas, 3 módulos) |
+| `51bf3f0` | API REST inicial con Spring Boot, seguridad y PostgreSQL |
 
-# O con variables de entorno (local)
-export POSTGRES_URL=jdbc:postgresql://localhost:5432/atelier
-export POSTGRES_USER=atelier
-export POSTGRES_PASSWORD=secret
-./mvnw spring-boot:run
-```
+---
 
-El servicio queda en `http://localhost:8080`.
+## 5. ¿Qué sigue?
 
-## Esquema de base de datos
+| Tema | Próximo paso |
+|---|---|
+| **Supabase** | Pasar las credenciales y verificar conexión real + tests. |
+| **Alineación modelo Django vs. API** | Decidir si `Producto` de Django se mapea a `Prenda` de la API o se mantiene aparte. |
+| **Endpoints que necesita Django** | Algunos ya están (paginación, filtros, slug); los agregados (`Sum(stock)`) quedan para después. |
+| **Push** | Los 5 commits ya están en la rama remota `feature/backend-api-inventario`. |
 
-El esquema **no** lo gestiona Hibernate. Se gestiona con **Flyway**, con
-archivos SQL en `src/main/resources/db/migration/`:
+---
 
-| Archivo | Contenido |
-| --- | --- |
-| `V1__diseno_generativo.sql` | `prenda`, `propuesta_diseno` |
-| `V2__tendencias.sql` | `tendencia` |
-| `V3__inventario_viabilidad.sql` | `material`, `prenda_material`, `analisis_viabilidad`, `alternativa_stock` |
-| `V4__mayusculas_enums.sql` | Ajusta los `CHECK` de enums a mayúsculas |
-| `V5__prenda_slug.sql` | Añade `prenda.slug`, con índice único |
-
-Al arrancar, Spring Boot aplica las migraciones pendientes automáticamente
-(`spring.flyway.enabled=true`).
-
-`spring.jpa.hibernate.ddl-auto=validate` está activo a propósito: Hibernate
-**nunca** altera el esquema, solo lo valida contra las entidades. Si cambias una
-entidad, tienes que crear una migración nueva.
-
-**Regla:** si agregas o modificas una columna, crea un archivo
-`V<n>__descripcion.sql`. Nunca edites una migración que ya corrió (Flyway guarda
-un checksum y fallará al arrancar).
-
-## Autenticación
-
-Todos los endpoints requieren autenticación HTTP Basic, excepto los de
-`/actuator` y las imágenes en `/imagenes/**`.
-
-- Usuario: `spring.security.user.name` (por defecto `user`)
-- Contraseña: `spring.security.user.password` (configúrala en
-  `application-local.properties` o en la variable de entorno correspondiente)
-
-CSRF está deshabilitado y no se usan sesiones, porque los consumidores son
-clientes de API.
-
-```bash
-curl -u user:tu-password http://localhost:8080/api/v1/salud
-```
-
-## Endpoints
-
-Base: `/api/v1`
-
-### Salud
-
-| Método | Ruta | Descripción |
-| --- | --- | --- |
-| GET | `/salud` | Comprobación de que el servicio responde |
-
-### Inventario
-
-| Método | Ruta | Descripción |
-| --- | --- | --- |
-| GET | `/materiales` | Lista el inventario, con filtros y paginación opcionales |
-| GET | `/materiales/activos` | Lista solo los activos |
-| GET | `/materiales/{id}` | Detalle de un material |
-| POST | `/materiales` | Crea un material |
-| PUT | `/materiales/{id}` | Actualiza un material |
-| DELETE | `/materiales/{id}` | Elimina un material |
-
-Parámetros de `GET /materiales`:
-
-| Parámetro | Descripción |
-| --- | --- |
-| `q` | Búsqueda libre en nombre, tipo y color |
-| `estado` | `AGOTADO`, `BAJO` o `DISPONIBLE` |
-| `activo` | `true` / `false` |
-| `pagina` | Número de página, **base 1** (como en Django) |
-| `tamano` | Tamaño de página. Por defecto 20, máximo 100 |
-
-`estado` se calcula con la misma regla que ya usaba la web: `AGOTADO` si
-`stock <= 0`, `BAJO` si `0 < stock <= stockMinimo`, `DISPONIBLE` en el resto.
-
-Ejemplo:
-
-```bash
-curl -u user:tu-password -X POST http://localhost:8080/api/v1/materiales \
-  -H "Content-Type: application/json" \
-  -d '{
-    "nombre": "Algodón peinado",
-    "tipo": "tela",
-    "color": "crudo",
-    "unidad": "METRO",
-    "stock": "120",
-    "stockMinimo": "20",
-    "proveedor": "Textiles SAC",
-    "precioUnitario": "18.50",
-    "activo": true
-  }'
-```
-
-`unidad` acepta: `METRO`, `UNIDAD`, `KILOGRAMO`, `ROLLO`.
-
-### Prendas
-
-| Método | Ruta | Descripción |
-| --- | --- | --- |
-| GET | `/prendas` | Lista las prendas, con filtros y paginación opcionales |
-| GET | `/prendas/slug/{slug}` | Detalle por slug, como lo abre la web |
-| GET | `/prendas/{id}` | Detalle de una prenda |
-| POST | `/prendas` | Crea una prenda (estado inicial `BORRADOR`) |
-| GET | `/prendas/{id}/materiales` | Ficha técnica con stock disponible |
-| POST | `/prendas/{id}/materiales` | Asigna un material a la prenda |
-
-Parámetros de `GET /prendas`: `q` (nombre o descripción), `tipo`, `estilo`,
-`estado`, `pagina`, `tamano`.
-
-`slug` se genera solo a partir del nombre (`"Vestido de verano"` →
-`vestido-de-verano`). Si dos prendas se llaman igual, la segunda recibe el
-sufijo `-2`. La web enlaza cada prenda por su slug, no por su id.
-
-`estado` acepta: `BORRADOR`, `GENERANDO`, `GENERADA`, `ANALIZADA`.
-
-### Paginación
-
-`/materiales`, `/prendas` y `/tendencias` devuelven un envoltorio común:
-
-```json
-{
-  "items": [ { "...": "..." } ],
-  "pagina": 1,
-  "tamano": 20,
-  "total": 118,
-  "totalPaginas": 6,
-  "primera": true,
-  "ultima": false
-}
-```
-
-Los nombres calcan el paginador de Django (`count`, `num_pages`, `page.number`)
-a propósito, para que la vista no tenga que traducir nada.
-
-**La paginación es opcional.** Si no se mandan `pagina` ni `tamano`, se devuelve
-todo en una sola página (`totalPaginas: 1`). Así el catálogo pagina a 12 por
-página mientras el inventario y los informes siguen recibiendo la lista
-completa.
-
-### Viabilidad
-
-| Método | Ruta | Descripción |
-| --- | --- | --- |
-| POST | `/viabilidad/{prendaId}` | Compara la ficha técnica con el stock y guarda el veredicto |
-| GET | `/viabilidad/{prendaId}/materiales` | Ficha técnica de la prenda |
-
-```bash
-curl -u user:tu-password -X POST http://localhost:8080/api/v1/viabilidad/1
-```
-
-Respuesta:
-
-```json
-{
-  "analisisId": 1,
-  "prendaId": 1,
-  "prenda": "Vestido de verano",
-  "viable": false,
-  "puntaje": 50,
-  "comentario": "No se puede producir Vestido de verano aun: faltan 1 material. Cobertura actual del 50%. Revisa las alternativas sugeridas.",
-  "detalles": [
-    { "materialId": 1, "material": "Algodón peinado", "unidad": "METRO",
-      "requerido": "15.000", "disponible": "120.000", "suficiente": true },
-    { "materialId": 2, "material": "Viscosa", "unidad": "METRO",
-      "requerido": "10.000", "disponible": "4.000", "suficiente": false }
-  ],
-  "alternativas": [
-    { "materialId": 3, "material": "Viscosa premium", "unidad": "METRO",
-      "stockDisponible": "80.000",
-      "motivo": "sustituye a Viscosa (stock insuficiente: faltan 6)" }
-  ]
-}
-```
-
-El análisis devuelve **200 aunque el veredicto sea `viable: false`**: "no se
-puede producir" es una respuesta válida, no un error.
-
-### Tendencias
-
-| Método | Ruta | Descripción |
-| --- | --- | --- |
-| GET | `/tendencias` | Lista las tendencias, con paginación opcional |
-| GET | `/tendencias/region/{region}` | Filtra por región |
-| POST | `/tendencias` | Registra una tendencia capturada |
-
-Ambos `GET` aceptan `pagina` y `tamano`.
-
-`region` acepta: `EUROPA`, `AMERICA`, `GLOBAL`.
-`fuente` acepta: `PINTEREST`, `TIENDA_MARCA`, `OTRO`.
-
-`urlOrigem` es única: si la URL ya fue registrada la API responde `409 Conflict`
-en lugar de duplicar el registro.
-
-### Diseño
-
-| Método | Ruta | Descripción |
-| --- | --- | --- |
-| GET | `/prendas/{id}/diseno/prompt` | Prompt de imagen listo para un modelo (lo redacta la IA o cae en plantilla) |
-| POST | `/prendas/{id}/diseno/propuestas` | Genera imágenes de diseño y las guarda en disco |
-| GET | `/prendas/{id}/diseno/propuestas` | Lista las propuestas generadas |
-| PUT | `/prendas/{id}/diseno/propuestas/{propuestaId}/seleccion` | Marca una propuesta como la elegida |
-
-Al generar, la prenda pasa de `BORRADOR` a `GENERADA`. Cada propuesta devuelve
-`imagenUrl` bajo `/imagenes/...`, que es un recurso estático **sin
-autenticación** (un `<img>` no puede mandar cabeceras Basic Auth).
-
-```bash
-# Ver el prompt que se enviaría al modelo
-curl -u user:tu-password http://localhost:8080/api/v1/prendas/1/diseno/prompt
-
-# Generar 2 propuestas
-curl -u user:tu-password -X POST http://localhost:8080/api/v1/prendas/1/diseno/propuestas \
-  -H "Content-Type: application/json" -d '{"cantidad": 2}'
-```
-
-Respuesta del prompt:
-
-```json
-{ "prompt": "Vestido de verano...", "fuente": "MODELO" }
-```
-
-`fuente` es `MODELO` cuando la IA respondió y `PLANTILLA` cuando no estaba
-disponible (ver más abajo). **El prompt nunca queda vacío.**
-
-`cantidad` se limita a 4 por petición.
-
-## Puente de IA
-
-El backend **decide**, el modelo **narra**. El cálculo de viabilidad (stock,
-puntaje, alternativas) es determinístico y vive en Java; el modelo solo redacta
-el comentario y las instrucciones de imagen. Si la IA falla o no está
-configurada, la API sigue funcionando igual, con texto de plantilla.
-
-Esto sigue `docs/modelos-ia.md` (pasos 4 y 5): la API no depende de Django para
-responder, y el `ClienteIa` abstrae el servidor de inferencia para poder apuntar
-a vLLM, Ollama, LM Studio o el gateway de Django sin tocar la lógica.
-
-### Configuración
-
-| Propiedad | Variable de entorno | Por defecto | Descripción |
-| --- | --- | --- | --- |
-| `atelier.ia.url` | `IA_URL` | *(vacío)* | URL base del servidor compatible con OpenAI, p. ej. `http://localhost:8000/v1`. **Vacío = IA deshabilitada.** |
-| `atelier.ia.api-key` | `IA_API_KEY` | *(vacío)* | Bearer opcional |
-| `atelier.ia.modelo-texto` | `IA_MODELO_TEXTO` | `Qwen3.6-35B-A3B` | Modelo para chat (comentario, prompt) |
-| `atelier.ia.modelo-imagen` | `IA_MODELO_IMAGEN` | `Qwen-Image` | Modelo para imágenes |
-| `atelier.ia.timeout-segundos` | `IA_TIMEOUT_SEGUNDOS` | `120` | Límite de espera. `<= 0` = sin límite |
-| `atelier.ia.directorio-imagenes` | `IA_DIRECTORIO_IMAGENES` | `imagenes-diseno` | Dónde se guardan los PNG en base64 |
-
-### Comportamiento
-
-| Situación | Texto / imágenes | HTTP |
-| --- | --- | --- |
-| `IA_URL` vacía (por defecto) | Plantilla local | `200` |
-| IA responde | Texto del modelo (`fuente: MODELO`) | `200` |
-| IA falla o no responde | Plantilla (texto) / error (imágenes) | `200` / `503` |
-
-Las imágenes **no** tienen respaldo: si el servidor de modelos no genera
-imágenes, el endpoint devuelve `503 Service Unavailable`, porque una imagen de
-plantilla sería un engaño.
-
-Para habilitar la IA:
-
-```bash
-export IA_URL=http://localhost:8000/v1
-./mvnw spring-boot:run -Dspring-boot.run.profiles=local
-```
-
-## Errores
-
-Todos los errores devuelven el mismo cuerpo:
-
-```json
-{
-  "timestamp": "2026-10-13T10:00:00-05:00",
-  "status": 400,
-  "error": "Bad Request",
-  "mensaje": "Los datos enviados no son validos",
-  "campos": { "nombre": "el nombre es obligatorio" }
-}
-```
-
-| Código | Cuándo |
-| --- | --- |
-| `400` | Fallo de validación o JSON mal formado |
-| `401` | Sin autenticación o credenciales incorrectas |
-| `404` | El recurso no existe |
-| `409` | Conflicto de unicidad (URL de tendencia repetida) |
-| `503` | El servidor de IA no respondió al generar imágenes |
-
-## Tests
-
-```bash
-./mvnw test
-```
-
-## Notas de diseño
-
-- **DTOs en `api/dto/`**: las entidades JPA tienen relaciones lazy; devolverlas
-  directamente provocaría `LazyInitializationException` o ciclos en Jackson. Se
-  mapean a DTOs dentro de la transacción.
-- **Capa de servicio en `servicio/`**: toda la lógica de negocio vive ahí, los
-  controladores solo traducen HTTP.
-- **`ddl-auto=validate`**: el esquema es responsabilidad de Flyway.
+*Última actualización: `014a7a0` — backend: paginación, filtros y slug para que la web consuma la API*
