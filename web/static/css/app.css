@@ -50,6 +50,9 @@ h1, h2, h3, h4 { line-height: 1.25; color: var(--marino); margin: 0 0 0.5rem; }
 p { margin: 0 0 1rem; }
 
 .contenedor { width: 100%; max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+@media (min-width: 1400px) { .contenedor { max-width: 1340px; } }
+@media (min-width: 1700px) { .contenedor { max-width: 1600px; } }
+@media (min-width: 2100px) { .contenedor { max-width: 1880px; } }
 
 .centrado { text-align: center; }
 
@@ -389,6 +392,9 @@ p { margin: 0 0 1rem; }
 /* ---------- Mensajes de la app ---------- */
 .mensajes { position: sticky; top: 74px; z-index: 40; }
 .mensajes-inner { max-width: 1200px; margin: 0 auto; padding: 12px 24px 0; display: grid; gap: 8px; }
+@media (min-width: 1400px) { .mensajes-inner { max-width: 1340px; } }
+@media (min-width: 1700px) { .mensajes-inner { max-width: 1600px; } }
+@media (min-width: 2100px) { .mensajes-inner { max-width: 1880px; } }
 .aviso {
   display: flex; align-items: center; gap: 0.6rem; border-radius: var(--radio-suave);
   padding: 0.8rem 1rem; font-size: 0.92rem; box-shadow: var(--sombra-carta);
