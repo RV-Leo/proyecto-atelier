@@ -18,11 +18,13 @@ object DatosFake {
             idCategoria = "polos",
             nombreCategoria = "Polos",
             precio = 69.90,
+            precioOriginal = 89.90,
             calificacion = 4.8,
             cantidadResenas = 124,
             descripcion = "Polo de algodón 100% Pima peruano de alta suavidad y ajuste perfecto.",
             esPopular = true,
             esNuevo = true,
+            esFavorito = true,
             colorHex = 0xFF2C3E50
         ),
         Producto(
@@ -31,10 +33,12 @@ object DatosFake {
             idCategoria = "pantalones",
             nombreCategoria = "Pantalones",
             precio = 129.90,
+            precioOriginal = 159.90,
             calificacion = 4.6,
             cantidadResenas = 89,
             descripcion = "Jean clásico elaborado en denim elástico para máxima comodidad diario.",
             esPopular = true,
+            esFavorito = false,
             colorHex = 0xFF1B3B6F
         ),
         Producto(
@@ -43,11 +47,13 @@ object DatosFake {
             idCategoria = "casacas",
             nombreCategoria = "Casacas",
             precio = 189.90,
+            precioOriginal = 229.90,
             calificacion = 4.9,
             cantidadResenas = 56,
             descripcion = "Casaca de jeans estilo retro con acabado lavado y botones metálicos.",
             esPopular = true,
             esNuevo = true,
+            esFavorito = true,
             colorHex = 0xFF4B6584
         ),
         Producto(
@@ -59,7 +65,8 @@ object DatosFake {
             calificacion = 4.7,
             cantidadResenas = 42,
             descripcion = "Camisa fresca de lino natural ideal para climas cálidos y eventos casuales.",
-            colorHex = 0xFFECEFF1
+            esFavorito = false,
+            colorHex = 0xFFD3D3D3
         ),
         Producto(
             id = "5",
@@ -67,9 +74,12 @@ object DatosFake {
             idCategoria = "poleras",
             nombreCategoria = "Poleras",
             precio = 99.90,
+            precioOriginal = 129.90,
             calificacion = 4.5,
             cantidadResenas = 78,
             descripcion = "Polera con capucha de franja felpada de textura suave e interior abrigador.",
+            esPopular = true,
+            esFavorito = true,
             colorHex = 0xFF37474F
         ),
         Producto(
@@ -81,6 +91,7 @@ object DatosFake {
             calificacion = 4.6,
             cantidadResenas = 63,
             descripcion = "Pantalón versátil de dril algodón suave, perfecto para oficina y fin de semana.",
+            esFavorito = false,
             colorHex = 0xFFD7CCC8
         ),
         Producto(
@@ -89,9 +100,11 @@ object DatosFake {
             idCategoria = "polos",
             nombreCategoria = "Polos",
             precio = 54.90,
+            precioOriginal = 69.90,
             calificacion = 4.4,
             cantidadResenas = 95,
             descripcion = "Polo cuello redondo con estampado gráfico exclusivo en la espalda.",
+            esFavorito = false,
             colorHex = 0xFF78909C
         ),
         Producto(
@@ -103,7 +116,9 @@ object DatosFake {
             calificacion = 4.8,
             cantidadResenas = 31,
             descripcion = "Vestido ligero con estampado de primavera y silueta fluida.",
-            colorHex = 0xFFE91E63
+            esNuevo = true,
+            esFavorito = true,
+            colorHex = 0xFF8E24AA
         )
     )
 }

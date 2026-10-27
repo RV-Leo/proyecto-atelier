@@ -11,10 +11,12 @@ data class Producto(
     val idCategoria: String,
     val nombreCategoria: String,
     val precio: Double,
+    val precioOriginal: Double? = null,
     val calificacion: Double,
     val cantidadResenas: Int,
     val descripcion: String,
     val esPopular: Boolean = false,
     val esNuevo: Boolean = false,
-    val colorHex: Long = 0xFF4A90E2
+    val esFavorito: Boolean = false,
+    val colorHex: Long = 0xFF2C3E50
 )
