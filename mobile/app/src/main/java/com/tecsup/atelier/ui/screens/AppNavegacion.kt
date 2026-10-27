@@ -2,6 +2,7 @@ package com.tecsup.atelier.ui.screens
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -116,11 +117,14 @@ private fun FlotanteBarraNavegacion(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {
+        // En Modo Claro: Fondo claro (Surface), Contorno Negro y Texto/Íconos Negros
+        // En Modo Oscuro: Fondo oscuro (Surface), Contorno Blanco y Texto/Íconos Blancos
         Surface(
             shape = RoundedCornerShape(32.dp),
-            color = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
-            shadowElevation = 8.dp,
+            color = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.onSurface),
+            shadowElevation = 6.dp,
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
@@ -134,7 +138,7 @@ private fun FlotanteBarraNavegacion(
                     val estaSeleccionado = rutaActual == destino.ruta
                     
                     val colorFondoCapsula by animateColorAsState(
-                        targetValue = if (estaSeleccionado) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.18f) else Color.Transparent,
+                        targetValue = if (estaSeleccionado) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f) else Color.Transparent,
                         label = "colorFondo"
                     )
                     
@@ -161,7 +165,7 @@ private fun FlotanteBarraNavegacion(
                             Icon(
                                 painter = painterResource(destino.icono),
                                 contentDescription = destino.titulo,
-                                tint = MaterialTheme.colorScheme.onPrimary,
+                                tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier
                                     .size(20.dp)
                                     .scale(escalaIcono)
@@ -171,7 +175,7 @@ private fun FlotanteBarraNavegacion(
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = destino.titulo,
-                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold
                                 )
