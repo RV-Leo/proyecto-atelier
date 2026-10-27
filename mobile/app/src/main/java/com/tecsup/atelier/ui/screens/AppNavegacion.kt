@@ -6,16 +6,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +34,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tecsup.atelier.ui.modelo.Producto
+import com.tecsup.atelier.ui.screens.detalle.DetalleProductoScreen
 import com.tecsup.atelier.ui.screens.ia.AiAssistantScreen
 import com.tecsup.atelier.ui.screens.inicio.HomeScreen
 import com.tecsup.atelier.ui.screens.pedido.OrdersScreen
@@ -46,22 +45,39 @@ import com.tecsup.atelier.ui.theme.AtelierTheme
 @Composable
 fun AppNavegacion() {
     var rutaActual by rememberSaveable { mutableStateOf(Rutas.Inicio.ruta) }
+    var productoSeleccionado by remember { mutableStateOf<Producto?>(null) }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         bottomBar = {
-            FlotanteBarraNavegacion(
-                rutaActual = rutaActual,
-                alSeleccionarRuta = { rutaActual = it }
-            )
+            if (productoSeleccionado == null) {
+                FlotanteBarraNavegacion(
+                    rutaActual = rutaActual,
+                    alSeleccionarRuta = { rutaActual = it }
+                )
+            }
         }
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
-            when (rutaActual) {
-                Rutas.Inicio.ruta -> HomeScreen()
-                Rutas.Pedido.ruta -> OrdersScreen()
-                Rutas.IA.ruta -> AiAssistantScreen()
-                Rutas.Perfil.ruta -> ProfileScreen()
+            if (productoSeleccionado != null) {
+                DetalleProductoScreen(
+                    producto = productoSeleccionado!!,
+                    alVolver = { productoSeleccionado = null },
+                    alAgregarAlCarrito = { _, _, _ ->
+                        productoSeleccionado = null
+                    }
+                )
+            } else {
+                when (rutaActual) {
+                    Rutas.Inicio.ruta -> HomeScreen(
+                        alSeleccionarProducto = { producto ->
+                            productoSeleccionado = producto
+                        }
+                    )
+                    Rutas.Pedido.ruta -> OrdersScreen()
+                    Rutas.IA.ruta -> AiAssistantScreen()
+                    Rutas.Perfil.ruta -> ProfileScreen()
+                }
             }
         }
     }
