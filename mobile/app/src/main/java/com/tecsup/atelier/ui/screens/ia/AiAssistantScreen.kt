@@ -23,14 +23,15 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,6 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tecsup.atelier.R
 import com.tecsup.atelier.ui.theme.AtelierTheme
 
@@ -63,30 +65,11 @@ data class OutfitRecomendado(
 )
 
 @Composable
-fun AiAssistantScreen(modifier: Modifier = Modifier) {
-    var mensajes by remember {
-        mutableStateOf(
-            listOf(
-                MensajeChat(
-                    remitente = "Atelier AI",
-                    texto = "¡Hola, Cliente! 👋 Soy tu estilista de moda IA. ¿Qué ocasión tienes hoy? Puedo armarte un outfit completo con combinaciones exclusivas de nuestra colección.",
-                    esUsuario = false
-                ),
-                MensajeChat(
-                    remitente = "Atelier AI",
-                    texto = "Aquí tienes una recomendación destacada basada en las tendencias de la temporada:",
-                    esUsuario = false,
-                    outfitRecomendado = OutfitRecomendado(
-                        titulo = "Outfit Urban Minimalist",
-                        prendasSummary = "Polo Pima Premium Azul + Jean Slim Fit Denim",
-                        precioTotal = 199.80,
-                        matchScore = "98% Match",
-                        colorHex = 0xFF2C3E50
-                    )
-                )
-            )
-        )
-    }
+fun AiAssistantScreen(
+    modifier: Modifier = Modifier,
+    viewModel: AsistenteIaViewModel = viewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
     var textoEntrada by remember { mutableStateOf("") }
 
     val sugerenciasConsulta = listOf(
@@ -131,7 +114,7 @@ fun AiAssistantScreen(modifier: Modifier = Modifier) {
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    text = "Asesoría personalizada en moda Atelier",
+                    text = "Conectado mediante API (Retrofit / OkHttp)",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -142,7 +125,7 @@ fun AiAssistantScreen(modifier: Modifier = Modifier) {
 
         // Sugerencias Rápidas
         Text(
-            text = "Sugerencias de estilo:",
+            text = "Consultas sugeridas:",
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -164,20 +147,7 @@ fun AiAssistantScreen(modifier: Modifier = Modifier) {
                             shape = RoundedCornerShape(20.dp)
                         )
                         .clickable {
-                            val mensajeUsuario = MensajeChat("Usuario", sugerencia, true)
-                            val respuestaIA = MensajeChat(
-                                "Atelier AI",
-                                "¡Excelente elección! Te recomiendo este outfit completo:",
-                                false,
-                                OutfitRecomendado(
-                                    titulo = "Outfit Elegante Casual",
-                                    prendasSummary = "Camisa Lino Blanca + Pantalón Chino Beige",
-                                    precioTotal = 234.80,
-                                    matchScore = "96% Match",
-                                    colorHex = 0xFFD7CCC8
-                                )
-                            )
-                            mensajes = mensajes + mensajeUsuario + respuestaIA
+                            viewModel.enviarConsulta(sugerencia)
                         }
                 ) {
                     Text(
@@ -199,8 +169,32 @@ fun AiAssistantScreen(modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(bottom = 80.dp)
         ) {
-            items(mensajes) { mensaje ->
+            items(uiState.mensajes) { mensaje ->
                 BurbujaMensajeChat(mensaje = mensaje)
+            }
+
+            if (uiState.cargando) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.Start,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "Consultando modelo de IA...",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
         }
 
@@ -214,7 +208,7 @@ fun AiAssistantScreen(modifier: Modifier = Modifier) {
             OutlinedTextField(
                 value = textoEntrada,
                 onValueChange = { textoEntrada = it },
-                placeholder = { Text("Escribe tu consulta de moda...") },
+                placeholder = { Text("Escribe tu consulta a la IA...") },
                 singleLine = true,
                 shape = RoundedCornerShape(24.dp),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -233,13 +227,7 @@ fun AiAssistantScreen(modifier: Modifier = Modifier) {
                     .size(50.dp)
                     .clickable {
                         if (textoEntrada.isNotBlank()) {
-                            val userMsg = MensajeChat("Usuario", textoEntrada, true)
-                            val aiMsg = MensajeChat(
-                                "Atelier AI",
-                                "Para tu consulta \"$textoEntrada\", te recomiendo combinar tus prendas favoritas en tonos neutros para mantener la elegancia.",
-                                false
-                            )
-                            mensajes = mensajes + userMsg + aiMsg
+                            viewModel.enviarConsulta(textoEntrada)
                             textoEntrada = ""
                         }
                     }
@@ -272,7 +260,7 @@ private fun BurbujaMensajeChat(mensaje: MensajeChat) {
             ),
             color = if (mensaje.esUsuario) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
             contentColor = if (mensaje.esUsuario) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.fillMaxWidth(0.88f)
+            modifier = Modifier.fillMaxWidth(0.85f)
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
                 Text(
