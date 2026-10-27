@@ -1,5 +1,6 @@
 package com.tecsup.atelier.ui.screens.pedido
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -38,6 +39,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -91,7 +95,10 @@ val pedidosEjemplo = listOf(
 )
 
 @Composable
-fun OrdersScreen(modifier: Modifier = Modifier) {
+fun OrdersScreen(
+    modifier: Modifier = Modifier,
+    alSeleccionarRastrear: (String) -> Unit = {}
+) {
     var filtroEstadoSeleccionado by remember { mutableStateOf("Todos") }
     val filtros = listOf("Todos", "En camino", "Entregados")
 
@@ -176,14 +183,20 @@ fun OrdersScreen(modifier: Modifier = Modifier) {
             contentPadding = PaddingValues(bottom = 90.dp)
         ) {
             items(pedidosFiltrados, key = { it.idPedido }) { pedido ->
-                TarjetaPedidoPro(pedido = pedido)
+                TarjetaPedidoPro(
+                    pedido = pedido,
+                    alRastrear = { alSeleccionarRastrear(pedido.idPedido) }
+                )
             }
         }
     }
 }
 
 @Composable
-private fun TarjetaPedidoPro(pedido: ItemPedido) {
+private fun TarjetaPedidoPro(
+    pedido: ItemPedido,
+    alRastrear: () -> Unit
+) {
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
@@ -235,10 +248,10 @@ private fun TarjetaPedidoPro(pedido: ItemPedido) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // Indicador Timeline de Estado del Pedido
-            BarraProgresoEstadoPedido(pasoActual = pedido.pasoEstado)
+            // Indicador Timeline Ondeado
+            BarraProgresoOndeadaEstadoPedido(pasoActual = pedido.pasoEstado)
 
             Spacer(modifier = Modifier.height(14.dp))
 
@@ -293,7 +306,7 @@ private fun TarjetaPedidoPro(pedido: ItemPedido) {
                 }
 
                 Button(
-                    onClick = { },
+                    onClick = alRastrear,
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
@@ -308,40 +321,95 @@ private fun TarjetaPedidoPro(pedido: ItemPedido) {
     }
 }
 
+/**
+ * Componente Canvas que dibuja una línea ondeada/sinusoidal conectando los 4 nodos de estado.
+ */
 @Composable
-private fun BarraProgresoEstadoPedido(pasoActual: Int) {
+private fun BarraProgresoOndeadaEstadoPedido(pasoActual: Int) {
     val pasos = listOf("Confirmado", "Preparando", "En camino", "Entregado")
+    val colorPrimary = MaterialTheme.colorScheme.primary
+    val colorInactivo = MaterialTheme.colorScheme.outlineVariant
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        pasos.forEachIndexed { idx, paso ->
-            val completado = (idx + 1) <= pasoActual
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.weight(1f)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(18.dp)
-                        .clip(CircleShape)
-                        .background(if (completado) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (completado) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.onPrimary)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(36.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // Dibujar la línea ondeada detrás de los nodos
+            Canvas(modifier = Modifier.fillMaxWidth().height(36.dp)) {
+                val width = size.width
+                val height = size.height
+                val midY = height / 2f
+                val stepWidth = width / 3f
+
+                // Dibujar curva ondeada usando Path
+                val path = Path().apply {
+                    moveTo(0f, midY)
+                    for (i in 0..2) {
+                        val startX = i * stepWidth
+                        val endX = (i + 1) * stepWidth
+                        val waveOffset = if (i % 2 == 0) -14f else 14f
+                        cubicTo(
+                            startX + stepWidth / 3f, midY + waveOffset,
+                            endX - stepWidth / 3f, midY - waveOffset,
+                            endX, midY
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
+                drawPath(
+                    path = path,
+                    color = colorPrimary,
+                    style = Stroke(
+                        width = 3.dp.toPx(),
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 8f), 0f)
+                    )
+                )
+            }
 
+            // Nodos circulares
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                pasos.forEachIndexed { idx, _ ->
+                    val completado = (idx + 1) <= pasoActual
+                    Surface(
+                        shape = CircleShape,
+                        color = if (completado) colorPrimary else MaterialTheme.colorScheme.surface,
+                        border = androidx.compose.foundation.BorderStroke(
+                            2.dp,
+                            if (completado) colorPrimary else colorInactivo
+                        ),
+                        modifier = Modifier.size(20.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            if (completado) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.onPrimary)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Etiquetas de texto
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            pasos.forEachIndexed { idx, paso ->
+                val completado = (idx + 1) <= pasoActual
                 Text(
                     text = paso,
                     fontSize = 9.sp,

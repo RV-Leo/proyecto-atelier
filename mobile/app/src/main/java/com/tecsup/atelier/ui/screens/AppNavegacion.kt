@@ -39,44 +39,66 @@ import com.tecsup.atelier.ui.screens.detalle.DetalleProductoScreen
 import com.tecsup.atelier.ui.screens.ia.AiAssistantScreen
 import com.tecsup.atelier.ui.screens.inicio.HomeScreen
 import com.tecsup.atelier.ui.screens.pedido.OrdersScreen
+import com.tecsup.atelier.ui.screens.pedido.RastrearPedidoScreen
 import com.tecsup.atelier.ui.screens.perfil.ProfileScreen
 import com.tecsup.atelier.ui.theme.AtelierTheme
 
 @Composable
 fun AppNavegacion() {
+    var esModoOscuro by rememberSaveable { mutableStateOf(false) }
     var rutaActual by rememberSaveable { mutableStateOf(Rutas.Inicio.ruta) }
     var productoSeleccionado by remember { mutableStateOf<Producto?>(null) }
+    var idPedidoRastreoSeleccionado by remember { mutableStateOf<String?>(null) }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        bottomBar = {
-            if (productoSeleccionado == null) {
-                FlotanteBarraNavegacion(
-                    rutaActual = rutaActual,
-                    alSeleccionarRuta = { rutaActual = it }
-                )
-            }
-        }
-    ) { innerPadding ->
-        Box(modifier = Modifier.padding(innerPadding)) {
-            if (productoSeleccionado != null) {
-                DetalleProductoScreen(
-                    producto = productoSeleccionado!!,
-                    alVolver = { productoSeleccionado = null },
-                    alAgregarAlCarrito = { _, _, _ ->
-                        productoSeleccionado = null
-                    }
-                )
-            } else {
-                when (rutaActual) {
-                    Rutas.Inicio.ruta -> HomeScreen(
-                        alSeleccionarProducto = { producto ->
-                            productoSeleccionado = producto
-                        }
+    AtelierTheme(darkTheme = esModoOscuro) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            bottomBar = {
+                // Ocultar la barra flotante al estar en vista de Detalle o Rastreo
+                if (productoSeleccionado == null && idPedidoRastreoSeleccionado == null) {
+                    FlotanteBarraNavegacion(
+                        rutaActual = rutaActual,
+                        alSeleccionarRuta = { rutaActual = it }
                     )
-                    Rutas.Pedido.ruta -> OrdersScreen()
-                    Rutas.IA.ruta -> AiAssistantScreen()
-                    Rutas.Perfil.ruta -> ProfileScreen()
+                }
+            }
+        ) { innerPadding ->
+            Box(modifier = Modifier.padding(innerPadding)) {
+                when {
+                    productoSeleccionado != null -> {
+                        DetalleProductoScreen(
+                            producto = productoSeleccionado!!,
+                            alVolver = { productoSeleccionado = null },
+                            alAgregarAlCarrito = { _, _, _ ->
+                                productoSeleccionado = null
+                            }
+                        )
+                    }
+                    idPedidoRastreoSeleccionado != null -> {
+                        RastrearPedidoScreen(
+                            idPedido = idPedidoRastreoSeleccionado!!,
+                            alVolver = { idPedidoRastreoSeleccionado = null }
+                        )
+                    }
+                    else -> {
+                        when (rutaActual) {
+                            Rutas.Inicio.ruta -> HomeScreen(
+                                alSeleccionarProducto = { producto ->
+                                    productoSeleccionado = producto
+                                }
+                            )
+                            Rutas.Pedido.ruta -> OrdersScreen(
+                                alSeleccionarRastrear = { idPedido ->
+                                    idPedidoRastreoSeleccionado = idPedido
+                                }
+                            )
+                            Rutas.IA.ruta -> AiAssistantScreen()
+                            Rutas.Perfil.ruta -> ProfileScreen(
+                                esModoOscuro = esModoOscuro,
+                                alAlternarModoOscuro = { esModoOscuro = it }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -97,6 +119,7 @@ private fun FlotanteBarraNavegacion(
         Surface(
             shape = RoundedCornerShape(32.dp),
             color = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
             shadowElevation = 8.dp,
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -116,7 +139,7 @@ private fun FlotanteBarraNavegacion(
                     )
                     
                     val escalaIcono by animateFloatAsState(
-                        targetValue = if (estaSeleccionado) 1.1f else 1.0f,
+                        targetValue = if (estaSeleccionado) 1.12f else 1.0f,
                         label = "escala"
                     )
 

@@ -30,10 +30,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,9 +56,11 @@ val opcionesPerfil = listOf(
 )
 
 @Composable
-fun ProfileScreen(modifier: Modifier = Modifier) {
-    var modoOscuroActivo by remember { mutableStateOf(false) }
-
+fun ProfileScreen(
+    modifier: Modifier = Modifier,
+    esModoOscuro: Boolean = false,
+    alAlternarModoOscuro: (Boolean) -> Unit = {}
+) {
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -257,7 +255,7 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
                     color = MaterialTheme.colorScheme.outlineVariant
                 )
 
-                // Fila de Modo Oscuro con Switch
+                // Fila de Modo Oscuro con Switch vinculado a tema global
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -272,15 +270,15 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
-                            text = "Ajustar interfaz nocturna",
+                            text = "Ajustar tema claro u oscuro",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
                     Switch(
-                        checked = modoOscuroActivo,
-                        onCheckedChange = { modoOscuroActivo = it },
+                        checked = esModoOscuro,
+                        onCheckedChange = alAlternarModoOscuro,
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
                             checkedTrackColor = MaterialTheme.colorScheme.primary
