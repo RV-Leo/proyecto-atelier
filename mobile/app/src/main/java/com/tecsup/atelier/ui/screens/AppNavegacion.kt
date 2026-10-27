@@ -1,19 +1,42 @@
 package com.tecsup.atelier.ui.screens
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.tecsup.atelier.ui.screens.ia.AiAssistantScreen
 import com.tecsup.atelier.ui.screens.inicio.HomeScreen
 import com.tecsup.atelier.ui.screens.pedido.OrdersScreen
@@ -24,29 +47,99 @@ import com.tecsup.atelier.ui.theme.AtelierTheme
 fun AppNavegacion() {
     var rutaActual by rememberSaveable { mutableStateOf(Rutas.Inicio.ruta) }
 
-    NavigationSuiteScaffold(
-        navigationSuiteItems = {
-            Rutas.items().forEach { destino ->
-                item(
-                    icon = {
-                        Icon(
-                            painterResource(destino.icono),
-                            contentDescription = destino.titulo
-                        )
-                    },
-                    label = { Text(destino.titulo) },
-                    selected = rutaActual == destino.ruta,
-                    onClick = { rutaActual = destino.ruta }
-                )
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        bottomBar = {
+            FlotanteBarraNavegacion(
+                rutaActual = rutaActual,
+                alSeleccionarRuta = { rutaActual = it }
+            )
+        }
+    ) { innerPadding ->
+        Box(modifier = Modifier.padding(innerPadding)) {
+            when (rutaActual) {
+                Rutas.Inicio.ruta -> HomeScreen()
+                Rutas.Pedido.ruta -> OrdersScreen()
+                Rutas.IA.ruta -> AiAssistantScreen()
+                Rutas.Perfil.ruta -> ProfileScreen()
             }
         }
+    }
+}
+
+@Composable
+private fun FlotanteBarraNavegacion(
+    rutaActual: String,
+    alSeleccionarRuta: (String) -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-            when (rutaActual) {
-                Rutas.Inicio.ruta -> HomeScreen(modifier = Modifier.padding(innerPadding))
-                Rutas.Pedido.ruta -> OrdersScreen(modifier = Modifier.padding(innerPadding))
-                Rutas.IA.ruta -> AiAssistantScreen(modifier = Modifier.padding(innerPadding))
-                Rutas.Perfil.ruta -> ProfileScreen(modifier = Modifier.padding(innerPadding))
+        Surface(
+            shape = RoundedCornerShape(32.dp),
+            color = MaterialTheme.colorScheme.primary,
+            shadowElevation = 8.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Rutas.items().forEach { destino ->
+                    val estaSeleccionado = rutaActual == destino.ruta
+                    
+                    val colorFondoCapsula by animateColorAsState(
+                        targetValue = if (estaSeleccionado) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.18f) else Color.Transparent,
+                        label = "colorFondo"
+                    )
+                    
+                    val escalaIcono by animateFloatAsState(
+                        targetValue = if (estaSeleccionado) 1.1f else 1.0f,
+                        label = "escala"
+                    )
+
+                    Surface(
+                        shape = RoundedCornerShape(24.dp),
+                        color = colorFondoCapsula,
+                        modifier = Modifier
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = { alSeleccionarRuta(destino.ruta) }
+                            )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(destino.icono),
+                                contentDescription = destino.titulo,
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .scale(escalaIcono)
+                            )
+                            
+                            if (estaSeleccionado) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = destino.titulo,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }

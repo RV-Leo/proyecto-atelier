@@ -19,9 +19,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -47,7 +50,16 @@ import com.tecsup.atelier.ui.theme.AtelierTheme
 data class MensajeChat(
     val remitente: String,
     val texto: String,
-    val esUsuario: Boolean
+    val esUsuario: Boolean,
+    val outfitRecomendado: OutfitRecomendado? = null
+)
+
+data class OutfitRecomendado(
+    val titulo: String,
+    val prendasSummary: String,
+    val precioTotal: Double,
+    val matchScore: String,
+    val colorHex: Long
 )
 
 @Composable
@@ -57,8 +69,20 @@ fun AiAssistantScreen(modifier: Modifier = Modifier) {
             listOf(
                 MensajeChat(
                     remitente = "Atelier AI",
-                    texto = "¡Hola! 👋 Soy tu estilista de moda IA. Puedo recomendarte outfits, guías de tallas en algodón Pima y sugerirte combinaciones exclusivas.",
+                    texto = "¡Hola, Cliente! 👋 Soy tu estilista de moda IA. ¿Qué ocasión tienes hoy? Puedo armarte un outfit completo con combinaciones exclusivas de nuestra colección.",
                     esUsuario = false
+                ),
+                MensajeChat(
+                    remitente = "Atelier AI",
+                    texto = "Aquí tienes una recomendación destacada basada en las tendencias de la temporada:",
+                    esUsuario = false,
+                    outfitRecomendado = OutfitRecomendado(
+                        titulo = "Outfit Urban Minimalist",
+                        prendasSummary = "Polo Pima Premium Azul + Jean Slim Fit Denim",
+                        precioTotal = 199.80,
+                        matchScore = "98% Match",
+                        colorHex = 0xFF2C3E50
+                    )
                 )
             )
         )
@@ -66,9 +90,9 @@ fun AiAssistantScreen(modifier: Modifier = Modifier) {
     var textoEntrada by remember { mutableStateOf("") }
 
     val sugerenciasConsulta = listOf(
-        "Armar outfit casual con Polo Pima",
-        "¿Cómo elegir talla de Jean Slim Fit?",
-        "Prendas recomendadas para la temporada"
+        "Armar outfit casual de fin de semana",
+        "¿Qué polo combina con Jean Slim Fit?",
+        "Guía de tallas en algodón Pima"
     )
 
     Column(
@@ -101,13 +125,13 @@ fun AiAssistantScreen(modifier: Modifier = Modifier) {
 
             Column {
                 Text(
-                    text = "Asistente de Estilo IA",
+                    text = "Asistente de Estilo IA ✨",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    text = "Asesoría personalizada en textiles Atelier",
+                    text = "Asesoría personalizada en moda Atelier",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -118,7 +142,7 @@ fun AiAssistantScreen(modifier: Modifier = Modifier) {
 
         // Sugerencias Rápidas
         Text(
-            text = "Consultas sugeridas:",
+            text = "Sugerencias de estilo:",
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -143,8 +167,15 @@ fun AiAssistantScreen(modifier: Modifier = Modifier) {
                             val mensajeUsuario = MensajeChat("Usuario", sugerencia, true)
                             val respuestaIA = MensajeChat(
                                 "Atelier AI",
-                                "¡Excelente consulta! Para un outfit óptimo, te recomiendo combinar el Polo Pima Premium Minimalist en color azul marino con el Pantalón Jean Slim Fit y calzado neutro.",
-                                false
+                                "¡Excelente elección! Te recomiendo este outfit completo:",
+                                false,
+                                OutfitRecomendado(
+                                    titulo = "Outfit Elegante Casual",
+                                    prendasSummary = "Camisa Lino Blanca + Pantalón Chino Beige",
+                                    precioTotal = 234.80,
+                                    matchScore = "96% Match",
+                                    colorHex = 0xFFD7CCC8
+                                )
                             )
                             mensajes = mensajes + mensajeUsuario + respuestaIA
                         }
@@ -165,8 +196,8 @@ fun AiAssistantScreen(modifier: Modifier = Modifier) {
         // Lista de Mensajes del Chat
         LazyColumn(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            contentPadding = PaddingValues(vertical = 8.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(bottom = 80.dp)
         ) {
             items(mensajes) { mensaje ->
                 BurbujaMensajeChat(mensaje = mensaje)
@@ -176,26 +207,61 @@ fun AiAssistantScreen(modifier: Modifier = Modifier) {
         Spacer(modifier = Modifier.height(10.dp))
 
         // Campo de entrada de texto
-        OutlinedTextField(
-            value = textoEntrada,
-            onValueChange = { textoEntrada = it },
-            placeholder = { Text("Escribe tu consulta a la IA...") },
-            singleLine = true,
-            shape = RoundedCornerShape(24.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface
-            ),
-            modifier = Modifier.fillMaxWidth()
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = textoEntrada,
+                onValueChange = { textoEntrada = it },
+                placeholder = { Text("Escribe tu consulta de moda...") },
+                singleLine = true,
+                shape = RoundedCornerShape(24.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                ),
+                modifier = Modifier.weight(1f)
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .size(50.dp)
+                    .clickable {
+                        if (textoEntrada.isNotBlank()) {
+                            val userMsg = MensajeChat("Usuario", textoEntrada, true)
+                            val aiMsg = MensajeChat(
+                                "Atelier AI",
+                                "Para tu consulta \"$textoEntrada\", te recomiendo combinar tus prendas favoritas en tonos neutros para mantener la elegancia.",
+                                false
+                            )
+                            mensajes = mensajes + userMsg + aiMsg
+                            textoEntrada = ""
+                        }
+                    }
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_add),
+                        contentDescription = "Enviar",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+        }
     }
 }
 
 @Composable
 private fun BurbujaMensajeChat(mensaje: MensajeChat) {
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (mensaje.esUsuario) Arrangement.End else Arrangement.Start
+        horizontalAlignment = if (mensaje.esUsuario) Alignment.End else Alignment.Start
     ) {
         Surface(
             shape = RoundedCornerShape(
@@ -206,13 +272,95 @@ private fun BurbujaMensajeChat(mensaje: MensajeChat) {
             ),
             color = if (mensaje.esUsuario) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
             contentColor = if (mensaje.esUsuario) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.fillMaxWidth(0.85f)
+            modifier = Modifier.fillMaxWidth(0.88f)
         ) {
-            Text(
-                text = mensaje.texto,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(14.dp)
-            )
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text(
+                    text = mensaje.texto,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                // Tarjeta de Outfit Recomendado
+                mensaje.outfitRecomendado?.let { outfit ->
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(90.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(outfit.colorHex))
+                            ) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.secondary,
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(8.dp)
+                                ) {
+                                    Text(
+                                        text = outfit.matchScore,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSecondary,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Text(
+                                text = outfit.titulo,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            Text(
+                                text = outfit.prendasSummary,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "S/ ${"%.2f".format(outfit.precioTotal)}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+
+                                Button(
+                                    onClick = { },
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary
+                                    ),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                                ) {
+                                    Text("Añadir Outfit", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

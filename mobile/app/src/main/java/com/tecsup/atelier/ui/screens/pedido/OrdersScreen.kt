@@ -1,6 +1,7 @@
 package com.tecsup.atelier.ui.screens.pedido
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,9 +26,14 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,7 +52,9 @@ data class ItemPedido(
     val resumenProductos: String,
     val montoTotal: Double,
     val estado: String,
-    val colorEstadoHex: Long
+    val pasoEstado: Int, // 1: Confirmado, 2: Preparando, 3: En camino, 4: Entregado
+    val colorEstadoHex: Long,
+    val coloresProductos: List<Long>
 )
 
 val pedidosEjemplo = listOf(
@@ -55,7 +64,9 @@ val pedidosEjemplo = listOf(
         resumenProductos = "1x Polo Pima Premium, 1x Pantalón Jean Slim Fit",
         montoTotal = 199.80,
         estado = "En camino",
-        colorEstadoHex = 0xFF1976D2
+        pasoEstado = 3,
+        colorEstadoHex = 0xFF1976D2,
+        coloresProductos = listOf(0xFF2C3E50, 0xFF1B3B6F)
     ),
     ItemPedido(
         idPedido = "#AT-7120",
@@ -63,7 +74,9 @@ val pedidosEjemplo = listOf(
         resumenProductos = "1x Casaca Denim Vintage Oversize",
         montoTotal = 189.90,
         estado = "Entregado",
-        colorEstadoHex = 0xFF388E3C
+        pasoEstado = 4,
+        colorEstadoHex = 0xFF388E3C,
+        coloresProductos = listOf(0xFF4B6584)
     ),
     ItemPedido(
         idPedido = "#AT-6501",
@@ -71,12 +84,25 @@ val pedidosEjemplo = listOf(
         resumenProductos = "2x Polo Graphic Art Streetwear",
         montoTotal = 109.80,
         estado = "Entregado",
-        colorEstadoHex = 0xFF388E3C
+        pasoEstado = 4,
+        colorEstadoHex = 0xFF388E3C,
+        coloresProductos = listOf(0xFF78909C, 0xFF78909C)
     )
 )
 
 @Composable
 fun OrdersScreen(modifier: Modifier = Modifier) {
+    var filtroEstadoSeleccionado by remember { mutableStateOf("Todos") }
+    val filtros = listOf("Todos", "En camino", "Entregados")
+
+    val pedidosFiltrados = remember(filtroEstadoSeleccionado) {
+        if (filtroEstadoSeleccionado == "Todos") {
+            pedidosEjemplo
+        } else {
+            pedidosEjemplo.filter { it.estado.equals(filtroEstadoSeleccionado, ignoreCase = true) }
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -96,7 +122,7 @@ fun OrdersScreen(modifier: Modifier = Modifier) {
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    text = "Sigue el estado de tus compras textiles",
+                    text = "Rastrea y gestiona tus compras textiles",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -118,23 +144,48 @@ fun OrdersScreen(modifier: Modifier = Modifier) {
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(18.dp))
+
+        // Pestañas de Filtro de Pedidos
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(bottom = 16.dp)
+        ) {
+            items(filtros) { filtro ->
+                val esActivo = filtro == filtroEstadoSeleccionado
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = if (esActivo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .clickable { filtroEstadoSeleccionado = filtro }
+                ) {
+                    Text(
+                        text = filtro,
+                        color = if (esActivo) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                        fontWeight = if (esActivo) FontWeight.Bold else FontWeight.Medium,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                }
+            }
+        }
 
         LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-            contentPadding = PaddingValues(bottom = 24.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(bottom = 90.dp)
         ) {
-            items(pedidosEjemplo, key = { it.idPedido }) { pedido ->
-                TarjetaPedidoElegante(pedido = pedido)
+            items(pedidosFiltrados, key = { it.idPedido }) { pedido ->
+                TarjetaPedidoPro(pedido = pedido)
             }
         }
     }
 }
 
 @Composable
-private fun TarjetaPedidoElegante(pedido: ItemPedido) {
+private fun TarjetaPedidoPro(pedido: ItemPedido) {
     Card(
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
@@ -184,13 +235,44 @@ private fun TarjetaPedidoElegante(pedido: ItemPedido) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            Text(
-                text = pedido.resumenProductos,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium
-            )
+            // Indicador Timeline de Estado del Pedido
+            BarraProgresoEstadoPedido(pasoActual = pedido.pasoEstado)
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Miniaturas de productos comprados
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                pedido.coloresProductos.forEach { col ->
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(col))
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(6.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = pedido.resumenProductos,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = "Total: S/ ${"%.2f".format(pedido.montoTotal)}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(14.dp))
 
@@ -200,21 +282,14 @@ private fun TarjetaPedidoElegante(pedido: ItemPedido) {
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Column {
-                    Text(
-                        text = "Total Pagado",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "S/ ${"%.2f".format(pedido.montoTotal)}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                OutlinedButton(
+                    onClick = { },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Volver a Comprar", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
 
                 Button(
@@ -224,14 +299,55 @@ private fun TarjetaPedidoElegante(pedido: ItemPedido) {
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary
                     ),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Text(
-                        text = "Rastrear Pedido",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("Rastrear", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BarraProgresoEstadoPedido(pasoActual: Int) {
+    val pasos = listOf("Confirmado", "Preparando", "En camino", "Entregado")
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        pasos.forEachIndexed { idx, paso ->
+            val completado = (idx + 1) <= pasoActual
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.weight(1f)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(18.dp)
+                        .clip(CircleShape)
+                        .background(if (completado) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (completado) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.onPrimary)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = paso,
+                    fontSize = 9.sp,
+                    fontWeight = if (completado) FontWeight.Bold else FontWeight.Medium,
+                    color = if (completado) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
