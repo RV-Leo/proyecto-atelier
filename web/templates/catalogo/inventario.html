@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Inventario · ATELIER{% endblock %}
+
+{% block contenido %}
+  <section class="seccion">
+    <div class="contenedor">
+      <div class="seccion-cabecera">
+        <div>
+          <h1 class="seccion-titulo">Inventario de materiales</h1>
+          <p class="seccion-subtitulo" style="margin-bottom:0">Disponibilidad real de telas y materiales para producción.</p>
+        </div>
+      </div>
+
+      <div class="resumen-stock">
+        <div class="resumen-stock-item">
+          <strong>{{ totales.disponible }}</strong>
+          <span>materiales<br>disponibles</span>
+        </div>
+        <div class="resumen-stock-item">
+          <strong style="color:var(--alerta)">{{ totales.bajo }}</strong>
+          <span>con stock<br>bajo</span>
+        </div>
+        <div class="resumen-stock-item">
+          <strong style="color:var(--error)">{{ totales.agotado }}</strong>
+          <span>agotados<br>actualmente</span>
+        </div>
+      </div>
+
+      <form class="filtros" method="get" action="{% url 'catalogo:inventario' %}">
+        <input type="search" name="q" value="{{ q }}" placeholder="Buscar material, color o tipo…" aria-label="Buscar material">
+        <select name="estado" aria-label="Estado del stock">
+          <option value="">Todo estado</option>
+          <option value="disponible" {% if estado_activo == 'disponible' %}selected{% endif %}>Disponible</option>
+          <option value="bajo" {% if estado_activo == 'bajo' %}selected{% endif %}>Stock bajo</option>
+          <option value="agotado" {% if estado_activo == 'agotado' %}selected{% endif %}>Agotado</option>
+        </select>
+        <button class="btn btn-suave btn-compacto" type="submit">Filtrar</button>
+        {% if q or estado_activo %}
+          <a class="btn btn-ghost btn-compacto" href="{% url 'catalogo:inventario' %}">Limpiar</a>
+        {% endif %}
+      </form>
+
+      {% if materiales %}
+        <div class="tabla-contenedor">
+          <table class="tabla">
+            <thead>
+              <tr>
+                <th>Material</th>
+                <th>Categoría</th>
+                <th>Color / Tipo</th>
+                <th>Composición</th>
+                <th>Cantidad</th>
+                <th>Precio unitario</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for material in materiales %}
+                <tr>
+                  <td><strong>{{ material.nombre }}</strong></td>
+                  <td>{{ material.categoria }}</td>
+                  <td>{{ material.color }}{% if material.tipo_tela %} · {{ material.tipo_tela }}{% endif %}</td>
+                  <td>{{ material.composicion }}</td>
+                  <td>{{ material.cantidad|floatformat:0 }} {{ material.get_unidad_medida_display }}</td>
+                  <td>$ {{ material.precio_unitario|floatformat:2 }}</td>
+                  <td>
+                    {% if material.agotado %}
+                      <span class="estado estado-agotado">Agotado</span>
+                    {% elif material.stock_bajo %}
+                      <span class="estado estado-bajo">Stock bajo</span>
+                    {% else %}
+                      <span class="estado estado-disponible">Disponible</span>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="vacio">
+          <div class="vacio-icono">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/></svg>
+          </div>
+          <h3>Sin materiales</h3>
+          <p>No hay materiales que coincidan con la búsqueda.</p>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+{% endblock %}

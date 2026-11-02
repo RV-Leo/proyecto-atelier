@@ -1,0 +1,194 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block titulo %}Mi espacio · ATELIER{% endblock %}
+
+{% block contenido %}
+  <section class="seccion">
+    <div class="contenedor">
+
+      <div class="cliente-hero revelar visible">
+        <div class="cliente-hero-texto">
+          <span class="cliente-eyebrow">Mi espacio privado · ATELIER</span>
+          <h1>Hola, {{ nombre }}</h1>
+          <p>Este es tu taller personal: guarda tus ideas, organiza tus colecciones y sigue explorando tendencias textiles.</p>
+          <div class="cliente-hero-acciones">
+            <a class="btn btn-primario" href="{% url 'disenador:asistente' %}">Crear un diseño</a>
+            <a class="btn btn-ghost" href="{% url 'catalogo:lista' %}">Explorar catálogo</a>
+          </div>
+        </div>
+        <div class="cliente-hero-metricas">
+          <div class="metrica">
+            <div class="metrica-valor">{{ total_colecciones }}</div>
+            <div class="metrica-etiqueta">Colecciones</div>
+          </div>
+          <div class="metrica">
+            <div class="metrica-valor">{{ total_propuestas }}</div>
+            <div class="metrica-etiqueta">Diseños generados</div>
+          </div>
+          <div class="metrica">
+            <div class="metrica-valor">{{ total_favoritos }}</div>
+            <div class="metrica-etiqueta">Favoritos</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-seccion">
+        <div class="panel-seccion-cabecera">
+          <h2>Tus accesos</h2>
+          <span style="color:var(--gris-texto);font-size:.9rem">Todo tu contenido privado, a un clic.</span>
+        </div>
+        <div class="panel-acciones">
+          <a class="panel-accion" href="{% url 'catalogo:lista' %}">
+            <div class="panel-accion-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 5h16v14H4z"/><path d="M4 9h16"/><path d="M8 13v5"/></svg></div>
+            <div><strong>Catálogo</strong><span>Prendas, telas y accesorios</span></div>
+          </a>
+          <a class="panel-accion" href="{% url 'tendencias:lista' %}">
+            <div class="panel-accion-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 17l5-5 4 4 8-9"/><path d="M20 7h-3v3"/></svg></div>
+            <div><strong>Tendencias</strong><span>Colores, telas y estilos</span></div>
+          </a>
+          <a class="panel-accion" href="{% url 'disenador:asistente' %}">
+            <div class="panel-accion-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 3l1.9 4.6 4.6 1.9-4.6 1.9L12 16l-1.9-4.6-4.6-1.9 4.6-1.9L12 3z"/><path d="M19 14l.9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9L19 14z"/></svg></div>
+            <div><strong>Diseñador IA</strong><span>Convierte una idea en propuestas</span></div>
+          </a>
+          <a class="panel-accion" href="{% url 'disenador:historial' %}">
+            <div class="panel-accion-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7"/></svg></div>
+            <div><strong>Mis diseños</strong><span>{{ total_propuestas }} propuesta{{ total_propuestas|pluralize }}</span></div>
+          </a>
+          <a class="panel-accion" href="#colecciones">
+            <div class="panel-accion-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 5h16v14H4z"/><path d="M9 9h7M9 13h7"/></svg></div>
+            <div><strong>Mis colecciones</strong><span>{{ total_colecciones }} colección{{ total_colecciones|pluralize }}</span></div>
+          </a>
+          <a class="panel-accion" href="{% url 'cuentas:perfil' %}">
+            <div class="panel-accion-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.3 3-6 7-6s7 2.7 7 6"/></svg></div>
+            <div><strong>Mi perfil</strong><span>Datos, preferencias y redes</span></div>
+          </a>
+        </div>
+      </div>
+
+      <div class="panel-seccion" id="colecciones">
+        <div class="panel-seccion-cabecera">
+          <h2>Mis colecciones</h2>
+          <a class="btn btn-suave btn-compacto" href="{% url 'cuentas:coleccion_nueva' %}">+ Nueva colección</a>
+        </div>
+        {% if colecciones %}
+          <div class="rejilla-estrecha colecciones-grid">
+            {% for coleccion in colecciones %}
+              <a class="carta revelar visible" href="{% url 'cuentas:coleccion_detalle' slug=coleccion.slug %}">
+                <div class="carta-imagen" style="aspect-ratio: 16/10">
+                  {% if coleccion.imagen %}
+                    <img src="{{ coleccion.imagen.url }}" alt="{{ coleccion.nombre }}">
+                  {% else %}
+                    <img src="{% static 'img/placeholder.svg' %}" alt="{{ coleccion.nombre }}">
+                  {% endif %}
+                </div>
+                <div class="carta-cuerpo">
+                  <span class="carta-categoria">Colección propia</span>
+                  <h3 class="carta-nombre">{{ coleccion.nombre }}</h3>
+                  <p class="carta-descripcion">{{ coleccion.descripcion|default:'Sin descripción.'|truncatewords:14 }}</p>
+                  <div class="carta-pie">
+                    <span class="carta-accion">{{ coleccion.productos.count }} producto{{ coleccion.productos.count|pluralize }}</span>
+                  </div>
+                </div>
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="vacio">
+            <div class="vacio-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 5h16v14H4z"/><path d="M9 9h7M9 13h7"/></svg></div>
+            <h3>Aún no tienes colecciones</h3>
+            <p>Agrupa tus prendas y diseños favoritos en una cápsula personal.</p>
+            <a class="btn btn-primario" href="{% url 'cuentas:coleccion_nueva' %}">Crear mi primera colección</a>
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="panel-seccion">
+        <div class="panel-seccion-cabecera">
+          <h2>Diseños guardados</h2>
+          <a class="enlace-cabecera" href="{% url 'disenador:historial' %}">Ver todo el historial →</a>
+        </div>
+        {% if favoritas %}
+          <div class="rejilla-estrecha">
+            {% for propuesta in favoritas %}
+              <article class="carta revelar visible">
+                <div class="carta-imagen">
+                  <div class="carta-insignia">
+                    <span class="insignia insignia-nuevo">★ Favorita</span>
+                  </div>
+                  {% if propuesta.imagen %}<img src="{{ propuesta.imagen.url }}" alt="{{ propuesta.resultado_resumen }}" loading="lazy">{% else %}<img src="{% static 'img/placeholder.svg' %}" alt="Propuesta" loading="lazy">{% endif %}
+                </div>
+                <div class="carta-cuerpo">
+                  <span class="carta-categoria">{{ propuesta.tipo_prenda|default:'Propuesta'|capfirst }} · {{ propuesta.estilo|default:'sin estilo' }}</span>
+                  <h3 class="carta-nombre">{{ propuesta.resultado_resumen|truncatewords:8 }}</h3>
+                  <p class="carta-descripcion">{{ propuesta.prompt|truncatewords:16 }}</p>
+                  <form method="post" action="{% url 'disenador:alternar_favorita' propuesta.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.path }}">
+                    <button class="btn btn-suave btn-bloque btn-compacto" type="submit">★ Quitar de favoritas</button>
+                  </form>
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p style="color:var(--gris-texto)">Cuando marques una propuesta como favorita la verás aquí. <a class="enlace-resaltado" href="{% url 'disenador:asistente' %}">Genera tu primer diseño</a>.</p>
+        {% endif %}
+      </div>
+
+      <div class="panel-seccion">
+        <div class="panel-seccion-cabecera">
+          <h2>Productos favoritos</h2>
+          <a class="enlace-cabecera" href="{% url 'cuentas:perfil' %}">Gestionar en mi perfil →</a>
+        </div>
+        {% if favoritos %}
+          <div class="carta carta-texto">
+            <ul class="listado-ligero">
+              {% for favorito in favoritos %}
+                <li>
+                  <a style="font-weight:600;color:var(--marino)" href="{{ favorito.producto.get_absolute_url }}">{{ favorito.producto.nombre }}</a>
+                  <span style="color:var(--gris-texto);font-size:.85rem">$ {{ favorito.producto.precio|floatformat:2 }}</span>
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% else %}
+          <p style="color:var(--gris-texto)">Marca ☆ en cualquier producto del catálogo para guardarlo aquí.</p>
+        {% endif %}
+      </div>
+
+      <div class="panel-seccion">
+        <div class="panel-seccion-cabecera">
+          <h2>Recomendaciones para ti</h2>
+          <a class="enlace-cabecera" href="{% url 'catalogo:lista' %}">Todo el catálogo →</a>
+        </div>
+        <div class="rejilla">
+          {% for producto in recomendados %}
+            {% include 'partials/producto_card.html' %}
+          {% empty %}
+            <div class="vacio"><p>No hay recomendaciones disponibles todavía.</p></div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {% if tendencias %}
+        <div class="panel-seccion">
+          <div class="panel-seccion-cabecera">
+            <h2>Tendencias para inspirarte</h2>
+            <a class="enlace-cabecera" href="{% url 'tendencias:lista' %}">Ver todas →</a>
+          </div>
+          <div class="chips">
+            {% for tendencia in tendencias %}
+              <a class="chip revelar visible" href="{% url 'tendencias:lista' %}">
+                {% if tendencia.color %}<span class="burbuja" style="background:{{ tendencia.color }}"></span>{% endif %}
+                {{ tendencia.nombre }}
+                <span class="chip-popularidad">{{ tendencia.popularidad }}%</span>
+              </a>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+
+    </div>
+  </section>
+{% endblock %}

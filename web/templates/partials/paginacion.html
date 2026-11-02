@@ -1,0 +1,14 @@
+{% comment %}Paginación del catálogo conservando los filtros activos.{% endcomment %}
+{% if pagina.has_other_pages %}
+  <nav class="paginacion" aria-label="Paginación">
+    {% for numero in pagina.paginator.page_range %}
+      {% if numero == pagina.number %}
+        <span class="pagina-actual">{{ numero }}</span>
+      {% else %}
+        <a href="?{% if filtros.q %}q={{ filtros.q|urlencode }}&{% endif %}{% if filtros.categoria %}categoria={{ filtros.categoria }}&{% endif %}{% if filtros.tipo %}tipo={{ filtros.tipo }}&{% endif %}{% if filtros.temporada %}temporada={{ filtros.temporada }}&{% endif %}{% if filtros.estilo %}estilo={{ filtros.estilo }}&{% endif %}pagina={{ numero }}">
+          {{ numero }}
+        </a>
+      {% endif %}
+    {% endfor %}
+  </nav>
+{% endif %}
