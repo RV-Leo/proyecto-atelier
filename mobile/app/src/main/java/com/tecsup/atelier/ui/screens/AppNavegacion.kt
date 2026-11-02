@@ -35,7 +35,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tecsup.atelier.ui.modelo.CarritoManager
 import com.tecsup.atelier.ui.modelo.Producto
+import com.tecsup.atelier.ui.screens.carrito.CarritoScreen
+import com.tecsup.atelier.ui.screens.carrito.ConfirmacionPedidoScreen
 import com.tecsup.atelier.ui.screens.detalle.DetalleProductoScreen
 import com.tecsup.atelier.ui.screens.ia.AiAssistantScreen
 import com.tecsup.atelier.ui.screens.inicio.HomeScreen
@@ -50,13 +53,15 @@ fun AppNavegacion() {
     var rutaActual by rememberSaveable { mutableStateOf(Rutas.Inicio.ruta) }
     var productoSeleccionado by remember { mutableStateOf<Producto?>(null) }
     var idPedidoRastreoSeleccionado by remember { mutableStateOf<String?>(null) }
+    var mostrandoCarrito by remember { mutableStateOf(false) }
+    var mostrandoCheckout by remember { mutableStateOf(false) }
 
     AtelierTheme(darkTheme = esModoOscuro) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             bottomBar = {
-                // Ocultar la barra flotante al estar en vista de Detalle o Rastreo
-                if (productoSeleccionado == null && idPedidoRastreoSeleccionado == null) {
+                // Ocultar la barra flotante al estar en vista de Detalle, Carrito, Checkout o Rastreo
+                if (productoSeleccionado == null && idPedidoRastreoSeleccionado == null && !mostrandoCarrito && !mostrandoCheckout) {
                     FlotanteBarraNavegacion(
                         rutaActual = rutaActual,
                         alSeleccionarRuta = { rutaActual = it }
@@ -66,12 +71,32 @@ fun AppNavegacion() {
         ) { innerPadding ->
             Box(modifier = Modifier.padding(innerPadding)) {
                 when {
+                    mostrandoCheckout -> {
+                        ConfirmacionPedidoScreen(
+                            alVolver = { mostrandoCheckout = false },
+                            alCompletarPedido = {
+                                mostrandoCheckout = false
+                                mostrandoCarrito = false
+                                rutaActual = Rutas.Pedido.ruta
+                            }
+                        )
+                    }
+                    mostrandoCarrito -> {
+                        CarritoScreen(
+                            alVolver = { mostrandoCarrito = false },
+                            alIrAPagar = {
+                                mostrandoCheckout = true
+                            }
+                        )
+                    }
                     productoSeleccionado != null -> {
                         DetalleProductoScreen(
                             producto = productoSeleccionado!!,
                             alVolver = { productoSeleccionado = null },
-                            alAgregarAlCarrito = { _, _, _ ->
+                            alAgregarAlCarrito = { prod, talla, cant ->
+                                CarritoManager.agregarProducto(prod, talla, cant)
                                 productoSeleccionado = null
+                                mostrandoCarrito = true
                             }
                         )
                     }
@@ -86,6 +111,9 @@ fun AppNavegacion() {
                             Rutas.Inicio.ruta -> HomeScreen(
                                 alSeleccionarProducto = { producto ->
                                     productoSeleccionado = producto
+                                },
+                                alAbrirCarrito = {
+                                    mostrandoCarrito = true
                                 }
                             )
                             Rutas.Pedido.ruta -> OrdersScreen(
@@ -117,8 +145,6 @@ private fun FlotanteBarraNavegacion(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {
-        // En Modo Claro: Fondo claro (Surface), Contorno Negro y Texto/Íconos Negros
-        // En Modo Oscuro: Fondo oscuro (Surface), Contorno Blanco y Texto/Íconos Blancos
         Surface(
             shape = RoundedCornerShape(32.dp),
             color = MaterialTheme.colorScheme.surface,

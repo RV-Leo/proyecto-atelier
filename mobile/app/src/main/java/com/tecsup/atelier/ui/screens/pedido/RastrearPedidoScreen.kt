@@ -117,11 +117,11 @@ fun RastrearPedidoScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Mapa Simulado Card
+        // Mapa Simulado Card - Color consistente Midnight Slate
         Card(
             shape = RoundedCornerShape(22.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primary
+                containerColor = Color(0xFF1E232A) // Color consistente elegante
             ),
             modifier = Modifier
                 .fillMaxWidth()
@@ -134,7 +134,7 @@ fun RastrearPedidoScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = "📍 RUTA EN TIEMPO REAL",
-                        color = MaterialTheme.colorScheme.secondary,
+                        color = Color(0xFFC68A4C),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.sp
@@ -142,14 +142,14 @@ fun RastrearPedidoScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "Tiempo Estimado: 10 mins",
-                        color = MaterialTheme.colorScheme.onPrimary,
+                        color = Color.White,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "Destino: Av. Principal 123, Lima",
-                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
+                        color = Color.White.copy(alpha = 0.8f),
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -235,7 +235,7 @@ fun RastrearPedidoScreen(
                                 modifier = Modifier
                                     .size(16.dp)
                                     .clip(CircleShape)
-                                    .background(if (ev.completado) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outlineVariant)
+                                    .background(if (ev.completado) Color(0xFFC68A4C) else MaterialTheme.colorScheme.outlineVariant)
                             )
                             if (idx < eventos.size - 1) {
                                 Box(

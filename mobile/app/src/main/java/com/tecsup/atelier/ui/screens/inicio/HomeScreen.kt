@@ -34,6 +34,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -52,6 +53,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tecsup.atelier.R
+import com.tecsup.atelier.ui.modelo.CarritoManager
 import com.tecsup.atelier.ui.modelo.Categoria
 import com.tecsup.atelier.ui.modelo.DatosFake
 import com.tecsup.atelier.ui.modelo.Producto
@@ -62,7 +64,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
-    alSeleccionarProducto: (Producto) -> Unit = {}
+    alSeleccionarProducto: (Producto) -> Unit = {},
+    alAbrirCarrito: () -> Unit = {}
 ) {
     var idCategoriaSeleccionada by remember { mutableStateOf("all") }
     var textoBusqueda by remember { mutableStateOf("") }
@@ -100,11 +103,12 @@ fun HomeScreen(
             item(span = { GridItemSpan(2) }) {
                 EncabezadoEditorialMinimalista(
                     textoBusqueda = textoBusqueda,
-                    alCambiarTextoBusqueda = { textoBusqueda = it }
+                    alCambiarTextoBusqueda = { textoBusqueda = it },
+                    alAbrirCarrito = alAbrirCarrito
                 )
             }
 
-            // 2. Banner Héroe Limpio
+            // 2. Banner Héroe con color de marca consistente
             item(span = { GridItemSpan(2) }) {
                 BannerHeroeMinimalista()
             }
@@ -179,6 +183,7 @@ fun HomeScreen(
                         esFavorito = esFav,
                         alAlternarFavorito = { favoritosState[producto.id] = !esFav },
                         alAgregarAlCarrito = {
+                            CarritoManager.agregarProducto(producto)
                             coroutineScope.launch {
                                 snackbarHostState.showSnackbar("Añadido al carrito: ${producto.nombre}")
                             }
@@ -188,7 +193,6 @@ fun HomeScreen(
                 }
             }
 
-            // Espaciador inferior para no tapar contenido con la barra de navegación flotante
             item(span = { GridItemSpan(2) }) {
                 Spacer(modifier = Modifier.height(70.dp))
             }
@@ -206,8 +210,12 @@ fun HomeScreen(
 @Composable
 private fun EncabezadoEditorialMinimalista(
     textoBusqueda: String,
-    alCambiarTextoBusqueda: (String) -> Unit
+    alCambiarTextoBusqueda: (String) -> Unit,
+    alAbrirCarrito: () -> Unit
 ) {
+    val itemsCarrito by CarritoManager.items.collectAsState()
+    val cantidadItems = itemsCarrito.sumOf { it.cantidad }
+
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -230,21 +238,40 @@ private fun EncabezadoEditorialMinimalista(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Notificación limpia
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clickable { }
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_notification),
-                            contentDescription = "Notificaciones",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(18.dp)
-                        )
+                // Botón Carrito con Contador Badge
+                Box(modifier = Modifier.clickable(onClick = alAbrirCarrito)) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_cart),
+                                contentDescription = "Carrito",
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+
+                    if (cantidadItems > 0) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier
+                                .size(18.dp)
+                                .align(Alignment.TopEnd)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = "$cantidadItems",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSecondary
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -253,14 +280,14 @@ private fun EncabezadoEditorialMinimalista(
                 // Avatar usuario
                 Surface(
                     shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.surfaceVariant,
                     modifier = Modifier.size(40.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Text(
                             text = "CA",
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 14.sp
                         )
                     }
@@ -270,7 +297,6 @@ private fun EncabezadoEditorialMinimalista(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Campo de búsqueda limpio sin bordes pesados
         OutlinedTextField(
             value = textoBusqueda,
             onValueChange = alCambiarTextoBusqueda,
@@ -301,7 +327,7 @@ private fun BannerHeroeMinimalista() {
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primary
+            containerColor = Color(0xFF1E232A)
         ),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -314,12 +340,12 @@ private fun BannerHeroeMinimalista() {
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Surface(
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = Color(0xFFC68A4C),
                     shape = RoundedCornerShape(6.dp)
                 ) {
                     Text(
                         text = "TEMPORADA 2025",
-                        color = MaterialTheme.colorScheme.onSecondary,
+                        color = Color.White,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
@@ -332,7 +358,7 @@ private fun BannerHeroeMinimalista() {
                     text = "20% OFF en Algodón Pima",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimary
+                    color = Color.White
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
@@ -340,13 +366,13 @@ private fun BannerHeroeMinimalista() {
                 Text(
                     text = "Descubre la máxima calidad y confort peruano",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
+                    color = Color.White.copy(alpha = 0.8f)
                 )
             }
 
             Surface(
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.onPrimary,
+                color = Color.White,
                 modifier = Modifier
                     .size(44.dp)
                     .clickable { }
@@ -355,7 +381,7 @@ private fun BannerHeroeMinimalista() {
                     Text(
                         text = "→",
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = Color(0xFF1E232A),
                         fontSize = 18.sp
                     )
                 }
@@ -406,7 +432,6 @@ private fun TarjetaProductoMinimalista(
             .clickable(onClick = alHacerClic)
     ) {
         Column {
-            // Contenedor visual limpio
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -414,10 +439,9 @@ private fun TarjetaProductoMinimalista(
                     .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
                     .background(Color(producto.colorHex))
             ) {
-                // Insignia si es nuevo
                 if (producto.esNuevo) {
                     Surface(
-                        color = MaterialTheme.colorScheme.secondary,
+                        color = Color(0xFFC68A4C),
                         shape = RoundedCornerShape(6.dp),
                         modifier = Modifier
                             .align(Alignment.TopStart)
@@ -425,7 +449,7 @@ private fun TarjetaProductoMinimalista(
                     ) {
                         Text(
                             text = "NUEVO",
-                            color = MaterialTheme.colorScheme.onSecondary,
+                            color = Color.White,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -433,7 +457,6 @@ private fun TarjetaProductoMinimalista(
                     }
                 }
 
-                // Botón Favorito
                 Surface(
                     shape = CircleShape,
                     color = Color.White.copy(alpha = 0.88f),
@@ -513,7 +536,6 @@ private fun TarjetaProductoMinimalista(
                         }
                     }
 
-                    // Botón Circular (+)
                     Surface(
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.primary,
