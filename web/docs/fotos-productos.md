@@ -30,3 +30,23 @@ Pexels permite el uso gratuito de fotos para fines comerciales sin atribución; 
 | `set-de-botones-de-nacar` | 5119776 | Alejandro Nuñez | [Pexels](https://www.pexels.com/photo/close-up-shot-of-buttons-5119776/) |
 
 Las portadas de las cuatro colecciones recomendadas reutilizan fotos de este catálogo y añaden una ficha de paleta con colores en formato hexadecimal. Los archivos finales están en `web/media/colecciones/` y mantienen proporción 16:10.
+
+## Imágenes de tendencias
+
+Las tendencias reutilizan fotos del catálogo con encuadre panorámico 16:10. La tabla remite a la foto base y su atribución Pexels arriba.
+
+| Tendencia | Foto del catálogo |
+|---|---|
+| Azul marino profundo | `chaqueta-sastre-cropped` |
+| Terracota cálida | `panuelo-de-seda-estampado` |
+| Verde oliva militar | `gasa-de-viscosa-estampada` |
+| Seda satinada | `seda-saten-duquesa` |
+| Lino arrugado | `lino-estampado-primavera` |
+| Lana de cachemira | `lana-cachemira-molton` |
+| Minimalismo sobrio | `camisa-de-algodon-clasica` |
+| Oversize editorial | `camisa-oversize-de-popelina` |
+| Boho contemporáneo | `vestido-largo-fluido` |
+| Vestidos fluidos | `vestido-midi-drapeado` |
+| Sastrería relajada | `pantalon-de-vestir-de-lana` |
+| Primavera-Verano 2026 | `vestido-de-lino-natural` |
+| Otoño-Invierno 2026 | `abrigo-de-pano-azul-marino` |

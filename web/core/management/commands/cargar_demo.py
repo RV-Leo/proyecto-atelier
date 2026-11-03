@@ -244,9 +244,14 @@ class Command(BaseCommand):
                 creados,
             )
             if creado and not objeto.imagen:
-                objeto.imagen = placeholder.generar_textura_ancha(
-                    f'tendencias/{objeto.slug}', color_inicio=(color or '#B8CBD5') or None
-                )
+                foto = Path(settings.MEDIA_ROOT) / 'tendencias' / f'{objeto.slug}.jpg'
+                if foto.is_file():
+                    objeto.imagen = f'tendencias/{objeto.slug}.jpg'
+                else:
+                    objeto.imagen = placeholder.generar_textura_ancha(
+                        f'tendencias/{objeto.slug}',
+                        color_inicio=(color or '#B8CBD5') or None,
+                    )
                 objeto.save(update_fields=['imagen'])
 
     def _colecciones(self, creados):
