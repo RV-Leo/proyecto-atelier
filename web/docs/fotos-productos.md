@@ -33,20 +33,20 @@ Las portadas de las cuatro colecciones recomendadas reutilizan fotos de este cat
 
 ## Imágenes de tendencias
 
-Las tendencias reutilizan fotos del catálogo con encuadre panorámico 16:10. La tabla remite a la foto base y su atribución Pexels arriba.
+Las imágenes de tendencias muestran telas, tejidos y materiales en encuadre panorámico 16:10; no incluyen modelos. Cada composición usa un acercamiento textil y una paleta de cuatro muestras. Los recortes mantienen la proporción de origen sin estirar. La tabla remite a la foto base y su atribución Pexels arriba.
 
 | Tendencia | Foto del catálogo |
 |---|---|
-| Azul marino profundo | `chaqueta-sastre-cropped` |
-| Terracota cálida | `panuelo-de-seda-estampado` |
+| Azul marino profundo | `gabardina-tecnica-impermeable` (matiz azul) |
+| Terracota cálida | `seda-saten-duquesa` (matiz cálido) |
 | Verde oliva militar | `gasa-de-viscosa-estampada` |
 | Seda satinada | `seda-saten-duquesa` |
 | Lino arrugado | `lino-estampado-primavera` |
 | Lana de cachemira | `lana-cachemira-molton` |
 | Minimalismo sobrio | `camisa-de-algodon-clasica` |
-| Oversize editorial | `camisa-oversize-de-popelina` |
-| Boho contemporáneo | `vestido-largo-fluido` |
-| Vestidos fluidos | `vestido-midi-drapeado` |
-| Sastrería relajada | `pantalon-de-vestir-de-lana` |
-| Primavera-Verano 2026 | `vestido-de-lino-natural` |
-| Otoño-Invierno 2026 | `abrigo-de-pano-azul-marino` |
+| Oversize editorial | `lino-estampado-primavera` con trama a cuadros editorial |
+| Boho contemporáneo | `gasa-de-viscosa-estampada` (matiz cálido) |
+| Vestidos fluidos | `lino-estampado-primavera` (matiz salvia) |
+| Sastrería relajada | `lana-cachemira-molton` (matiz pizarra) |
+| Primavera-Verano 2026 | `algodon-organico-popelina` |
+| Otoño-Invierno 2026 | `lana-cachemira-molton` (matiz cálido) |
