@@ -8,14 +8,24 @@
       <div class="seccion-cabecera">
         <div>
           <h1 class="seccion-titulo">Informes</h1>
-          <p class="seccion-subtitulo" style="margin-bottom:0">Indicadores reales calculados a partir de la base de datos del proyecto.</p>
+          <p class="seccion-subtitulo" style="margin-bottom:0">Indicadores calculados a partir de la API del backend.</p>
         </div>
       </div>
+
+      {% if error_api %}
+        <div class="nota-demo" role="alert">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+          <div>
+            <strong>No se pudieron consultar los indicadores.</strong>
+            {{ error_api }}
+          </div>
+        </div>
+      {% endif %}
 
       <div class="metricas">
         <div class="metrica revelar">
           <div class="metrica-valor" data-contador="{{ total_productos }}">0</div>
-          <div class="metrica-etiqueta">Prendas y telas registradas</div>
+          <div class="metrica-etiqueta">Prendas registradas</div>
         </div>
         <div class="metrica revelar">
           <div class="metrica-valor" data-contador="{{ total_materiales }}">0</div>
@@ -34,8 +44,8 @@
           <div class="metrica-etiqueta">Colecciones</div>
         </div>
         <div class="metrica revelar">
-          <div class="metrica-valor" data-contador="{{ stock_productos }}">0</div>
-          <div class="metrica-etiqueta">Unidades de producto</div>
+          <div class="metrica-valor" data-contador="{{ total_tipos }}">0</div>
+          <div class="metrica-etiqueta">Tipos de prenda</div>
         </div>
       </div>
     </div>
@@ -45,7 +55,7 @@
     <div class="contenedor" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:32px">
       <div class="carta carta-texto">
         <h2 style="font-size:1.2rem">Productos por categoría</h2>
-        <p style="color:var(--gris-texto);font-size:.9rem">Distribución del catálogo registrado.</p>
+        <p style="color:var(--gris-texto);font-size:.9rem">Distribución del catálogo por tipo de prenda.</p>
         {% if grafico_categorias %}
           <div class="grafico-barras">
             {% for fila in grafico_categorias %}
@@ -75,7 +85,7 @@
         </div>
         <p style="margin-top:1rem;font-size:.9rem;color:var(--gris-texto)">
           Stock total de materiales: <strong style="color:var(--marino)">{{ stock_materiales|floatformat:0 }}</strong> unidades ·
-          productos agotados: <strong style="color:var(--marino)">{{ agotados_productos }}</strong>
+          prendas analizadas: <strong style="color:var(--marino)">{{ analizadas }}</strong>
         </p>
       </div>
 
@@ -104,8 +114,7 @@
       <div class="nota-demo">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
         <div>
-          <strong>Datos calculados en vivo.</strong> Todos los indicadores se obtienen de la base de datos del proyecto.
-          Los datos iniciales son de demostración y se cargan con <code>python manage.py cargar_demo</code>.
+          <strong>Datos calculados en vivo.</strong> Los indicadores de catálogo e inventario se consultan por HTTP a la API del backend (PostgreSQL).
         </div>
       </div>
     </div>

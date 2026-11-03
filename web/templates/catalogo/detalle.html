@@ -1,78 +1,81 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block titulo %}{{ producto.nombre }} · ATELIER{% endblock %}
+{% block titulo %}{% if producto %}{{ producto.nombre }}{% else %}Prenda no disponible{% endif %} · ATELIER{% endblock %}
 
 {% block contenido %}
   <section class="seccion">
     <div class="contenedor">
-      {% if producto.categoria %}
+      {% if error_api %}
+        <div class="nota-demo" role="alert">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+          <div>
+            <strong>No se pudo cargar la prenda.</strong>
+            {{ error_api }}
+          </div>
+        </div>
+        <p style="margin-top:1.5rem"><a class="btn btn-ghost" href="{% url 'catalogo:lista' %}">← Volver al catálogo</a></p>
+      {% elif producto %}
         <p style="margin-bottom:1.25rem">
-          <a class="enlace-cabecera" href="{% url 'catalogo:lista' %}?categoria={{ producto.categoria.slug }}">← {{ producto.categoria.nombre }}</a>
+          <a class="enlace-cabecera" href="{% url 'catalogo:lista' %}?tipo={{ producto.tipo|urlencode }}">← {{ producto.get_tipo_display }}</a>
         </p>
-      {% endif %}
 
-      <div class="detalle-grid">
-        <div class="detalle-imagen">
-          {% if producto.imagen %}
-            <img src="{{ producto.imagen.url }}" alt="{{ producto.nombre }}">
-          {% else %}
-            <img src="{% static 'img/placeholder.svg' %}" alt="{{ producto.nombre }}">
-          {% endif %}
-        </div>
-
-        <div class="ficha">
-          <div class="carta-insignia" style="position:static;margin-bottom:1rem">
-            {% if producto.estado == 'agotado' %}
-              <span class="insignia insignia-agotado">Agotado</span>
-            {% elif producto.estado == 'tendencia' %}
-              <span class="insignia insignia-tendencia">Tendencia</span>
-            {% elif producto.estado == 'nuevo' %}
-              <span class="insignia insignia-nuevo">Nuevo</span>
-            {% endif %}
-            <span class="insignia" style="background:var(--gris-claro);color:var(--gris-texto)">{{ producto.get_tipo_display }}</span>
-          </div>
-
-          <h1>{{ producto.nombre }}</h1>
-          <p style="color:var(--gris-texto)">{{ producto.descripcion }}</p>
-          <p class="ficha-precio">$ {{ producto.precio|floatformat:2 }}</p>
-
-          <ul class="ficha-lista">
-            <li><strong>Material</strong><span>{{ producto.composicion|default:'No especificado' }}</span></li>
-            <li><strong>Color</strong><span>{{ producto.color|default:'—' }}</span></li>
-            <li><strong>Estilo</strong><span>{{ producto.estilo|default:'—' }}</span></li>
-            <li><strong>Temporada</strong><span>{{ producto.get_temporada_display }}</span></li>
-            <li><strong>Disponibilidad</strong><span>{{ producto.unidades }} unidades</span></li>
-          </ul>
-
-          <div class="hero-acciones" style="margin-top:1.5rem">
-            {% if user.is_authenticated %}
-              <form method="post" action="{% url 'cuentas:favorito_alternar' producto_id=producto.pk %}">
-                {% csrf_token %}
-                <input type="hidden" name="next" value="{{ request.path }}">
-                <button class="btn btn-ghost" type="submit">
-                  {{ es_favorito|yesno:'✔ En favoritos,☆ Guardar en favoritos' }}
-                </button>
-              </form>
-              <a class="btn btn-suave" href="{% url 'cuentas:coleccion_nueva' %}">+ Nueva colección</a>
+        <div class="detalle-grid">
+          <div class="detalle-imagen">
+            {% if producto.imagen %}
+              <img src="{{ producto.imagen.url }}" alt="{{ producto.nombre }}">
             {% else %}
-              <a class="btn btn-ghost" href="{% url 'cuentas:acceder' %}">☆ Guardar en favoritos</a>
+              <img src="{% static 'img/placeholder.svg' %}" alt="{{ producto.nombre }}">
+            {% endif %}
+          </div>
+
+          <div class="ficha">
+            <div class="carta-insignia" style="position:static;margin-bottom:1rem">
+              <span class="insignia" style="background:var(--gris-claro);color:var(--gris-texto)">{{ producto.get_tipo_display }}</span>
+            </div>
+
+            <h1>{{ producto.nombre }}</h1>
+            <p style="color:var(--gris-texto)">{{ producto.descripcion|default:'Sin descripción registrada.' }}</p>
+
+            <ul class="ficha-lista">
+              <li><strong>Tela</strong><span>{{ producto.tela|default:'No especificada' }}</span></li>
+              <li><strong>Color</strong><span>{{ producto.colores|default:'—' }}</span></li>
+              <li><strong>Estilo</strong><span>{{ producto.estilo|default:'—' }}</span></li>
+              <li><strong>Tipo</strong><span>{{ producto.get_tipo_display }}</span></li>
+              <li><strong>Estado</strong><span>{{ producto.get_estado_display }}</span></li>
+            </ul>
+
+            {% if favoritos_disponibles %}
+              <div class="hero-acciones" style="margin-top:1.5rem">
+                {% if user.is_authenticated %}
+                  <form method="post" action="{% url 'cuentas:favorito_alternar' producto_id=producto.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.path }}">
+                    <button class="btn btn-ghost" type="submit">
+                      {{ es_favorito|yesno:'✔ En favoritos,☆ Guardar en favoritos' }}
+                    </button>
+                  </form>
+                  <a class="btn btn-suave" href="{% url 'cuentas:coleccion_nueva' %}">+ Nueva colección</a>
+                {% else %}
+                  <a class="btn btn-ghost" href="{% url 'cuentas:acceder' %}">☆ Guardar en favoritos</a>
+                {% endif %}
+              </div>
             {% endif %}
           </div>
         </div>
-      </div>
 
-      {% if relacionados %}
-        <div class="seccion" style="padding-bottom:0">
-          <div class="seccion-cabecera">
-            <h2 class="seccion-titulo" style="font-size:1.4rem">También te puede interesar</h2>
+        {% if relacionados %}
+          <div class="seccion" style="padding-bottom:0">
+            <div class="seccion-cabecera">
+              <h2 class="seccion-titulo" style="font-size:1.4rem">También te puede interesar</h2>
+            </div>
+            <div class="rejilla-estrecha">
+              {% for producto in relacionados %}
+                {% include 'partials/producto_card.html' %}
+              {% endfor %}
+            </div>
           </div>
-          <div class="rejilla-estrecha">
-            {% for producto in relacionados %}
-              {% include 'partials/producto_card.html' %}
-            {% endfor %}
-          </div>
-        </div>
+        {% endif %}
       {% endif %}
     </div>
   </section>

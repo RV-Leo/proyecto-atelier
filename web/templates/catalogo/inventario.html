@@ -12,6 +12,17 @@
         </div>
       </div>
 
+      {% if error_api %}
+        <div class="nota-demo" role="alert">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+          <div>
+            <strong>No se pudo cargar el inventario.</strong>
+            {{ error_api }}
+            Revisa que el backend esté en marcha y que <code>API_BASE_URL</code> apunte a él.
+          </div>
+        </div>
+      {% endif %}
+
       <div class="resumen-stock">
         <div class="resumen-stock-item">
           <strong>{{ totales.disponible }}</strong>
@@ -47,9 +58,9 @@
             <thead>
               <tr>
                 <th>Material</th>
-                <th>Categoría</th>
-                <th>Color / Tipo</th>
-                <th>Composición</th>
+                <th>Tipo</th>
+                <th>Color</th>
+                <th>Proveedor</th>
                 <th>Cantidad</th>
                 <th>Precio unitario</th>
                 <th>Estado</th>
@@ -59,9 +70,9 @@
               {% for material in materiales %}
                 <tr>
                   <td><strong>{{ material.nombre }}</strong></td>
-                  <td>{{ material.categoria }}</td>
-                  <td>{{ material.color }}{% if material.tipo_tela %} · {{ material.tipo_tela }}{% endif %}</td>
-                  <td>{{ material.composicion }}</td>
+                  <td>{{ material.tipo|default:'—' }}</td>
+                  <td>{{ material.color|default:'—' }}</td>
+                  <td>{{ material.proveedor|default:'—' }}</td>
                   <td>{{ material.cantidad|floatformat:0 }} {{ material.get_unidad_medida_display }}</td>
                   <td>$ {{ material.precio_unitario|floatformat:2 }}</td>
                   <td>

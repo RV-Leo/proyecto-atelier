@@ -1,13 +1,44 @@
 """Pruebas de la app core: inicio e informes."""
 
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
+from catalogo.api_cliente import ApiNoDisponible, Pagina, Paginador, Prenda
 from core.management.commands.cargar_demo import Command as CargarDemo
 
 
+def _pagina(items, total=None, total_paginas=1):
+    total = len(items) if total is None else total
+    return Pagina(
+        object_list=items,
+        number=1,
+        tamano=len(items),
+        paginator=Paginador(count=total, num_pages=total_paginas),
+        primera=True,
+        ultima=True,
+    )
+
+
+def _prenda(nombre, slug, tipo='vestido', estado='ANALIZADA'):
+    return Prenda(
+        id=1, nombre=nombre, slug=slug, tipo=tipo, estilo='romántico',
+        colores='marfil', tela='lino', descripcion='fluido y ligero', estado=estado,
+    )
+
+
 class InicioTests(TestCase):
+    def setUp(self):
+        # La portada y los informes consultan la API: se simula para no depender
+        # de que el backend esté levantado durante las pruebas.
+        self.listar = patch(
+            'core.views.api_cliente.listar_prendas', return_value=_pagina([])
+        ).start()
+        patch('core.views.api_cliente.listar_materiales', return_value=[]).start()
+        self.addCleanup(patch.stopall)
+
     def test_inicio_publico_responde(self):
         respuesta = self.client.get(reverse('core:inicio'))
         self.assertEqual(respuesta.status_code, 200)
@@ -20,6 +51,17 @@ class InicioTests(TestCase):
         self.assertContains(respuesta, 'Crear cuenta')
         self.assertContains(respuesta, reverse('cuentas:acceder'))
         self.assertContains(respuesta, reverse('cuentas:registro'))
+
+    def test_inicio_muestra_prendas_de_la_api(self):
+        self.listar.return_value = _pagina([_prenda('Vestido Largo', 'vestido-largo')])
+        respuesta = self.client.get(reverse('core:inicio'))
+        self.assertContains(respuesta, 'Vestido Largo')
+
+    def test_inicio_avisa_si_la_api_no_responde(self):
+        self.listar.side_effect = ApiNoDisponible('API caída')
+        respuesta = self.client.get(reverse('core:inicio'))
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, 'El catálogo no está disponible')
 
     def test_informes_requieren_autenticacion(self):
         respuesta = self.client.get(reverse('informes:informes'))

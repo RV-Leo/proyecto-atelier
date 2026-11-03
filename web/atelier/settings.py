@@ -13,6 +13,29 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def _cargar_env(ruta):
+    """Carga variables desde ``.env`` sin pisar las que ya existen.
+
+    Django no lee ``.env`` por sí solo; este lector mínimo evita agregar una
+    dependencia solo para desarrollo local. En producción se pueden definir las
+    variables directamente en el entorno.
+    """
+    if not ruta.exists():
+        return
+    for linea in ruta.read_text(encoding='utf-8').splitlines():
+        linea = linea.strip()
+        if not linea or linea.startswith('#') or '=' not in linea:
+            continue
+        clave, valor = linea.split('=', 1)
+        clave = clave.strip()
+        valor = valor.strip().strip('"').strip("'")
+        if clave:
+            os.environ.setdefault(clave, valor)
+
+
+_cargar_env(BASE_DIR / '.env')
+
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get(
     'DJANGO_SECRET_KEY',
@@ -160,3 +183,13 @@ MESSAGE_TAGS = {
 # proveedor en disenador/servicios y cambiar este valor.
 AI_PROVEEDOR = os.environ.get('ATELIER_AI_PROVEEDOR', 'demo')
 AI_URL_BASE = os.environ.get('ATELIER_AI_URL_BASE', '')
+
+
+# Integración con la API del backend (Spring Boot)
+# -----------------------------------------------
+# La web no se conecta a PostgreSQL: las prendas y los materiales se piden por
+# HTTP a la API, que es la única que escribe en la base de datos.
+API_BASE_URL = os.environ.get('API_BASE_URL', 'http://localhost:8080/api/v1')
+API_USER = os.environ.get('API_USER', 'atelier')
+API_PASSWORD = os.environ.get('API_PASSWORD', 'atelier-dev')
+API_TIMEOUT = float(os.environ.get('API_TIMEOUT', '5'))

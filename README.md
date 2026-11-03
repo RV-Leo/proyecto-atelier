@@ -32,10 +32,10 @@ App móvil (Kotlin / Android) ──┐
                                ├──> API REST (Spring Boot) ──> Gateway IA (Django) ──> Modelos Qwen
 Aplicación web (Django) ───────┘                │                 
                                                 v
-                                  Base de datos (PostgreSQL propuesto)
+                                  Base de datos PostgreSQL (atelier)
 ```
 
-PostgreSQL es una propuesta para la base de datos; todavía no hay un motor configurado en el repositorio.
+PostgreSQL es la base de datos del backend. La web y el móvil **no se conectan a ella**: consumen la API REST por HTTP.
 
 ## Modelos de IA
 
@@ -67,6 +67,46 @@ atelier/
 ```
 2. Entra en la carpeta del módulo en el que vas a trabajar y sigue las instrucciones de su guía.
 3. Crea un archivo `.env` a partir de `.env.example`. No subas tu `.env` a GitHub.
+
+## Web: catálogo e inventario desde la API
+
+La web ya no lee prendas ni materiales de su propia base. `web/catalogo/views.py` usa `web/catalogo/api_cliente.py`, que llama a la API del backend con HTTP Basic. Django conserva SQLite **solo para sus tablas internas** (`auth_user`, sesiones, admin).
+
+1. Levanta el backend en `http://localhost:8080` (ver su guía).
+2. Copia `web/.env.example` a `web/.env` y ajusta:
+
+```env
+API_BASE_URL=http://localhost:8080/api/v1
+API_USER=atelier
+API_PASSWORD=atelier-dev
+API_TIMEOUT=5
+```
+
+3. Instala dependencias y prepara las tablas internas:
+
+```bash
+pip install -r web/requirements.txt
+python manage.py migrate
+python manage.py runserver
+```
+
+Qué consume la web:
+
+| Vista | Endpoint |
+|---|---|
+| Portada (`/`) | `GET /prendas?pagina=1&tamano=12` |
+| Catálogo (`/catalogo/`) | `GET /prendas?pagina=&tamano=12&q=&tipo=&estilo=` |
+| Detalle (`/catalogo/producto/<slug>/`) | `GET /prendas/slug/<slug>` |
+| Inventario (`/catalogo/inventario/`) | `GET /materiales?q=&estado=` |
+| Informes (admin) | `GET /prendas` y `GET /materiales` |
+
+Notas:
+
+- `pagina` es **base 1**; `tamano` por defecto 20 y máximo 100.
+- Django llama a la API desde el servidor, así que **no hace falta CORS**.
+- Si la API no responde, las vistas muestran un aviso y no un error 500.
+- Los campos que la API todavía no expone (precio, stock, imagen, favoritos) no se inventan: se ocultan en la interfaz.
+- Pruebas sin backend ni PostgreSQL: `python manage.py test catalogo core`.
 
 ## Cómo colaboramos
 

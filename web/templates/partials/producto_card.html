@@ -1,13 +1,13 @@
 {% load static %}
-{% comment %}Tarjeta de producto reutilizable en catálogo e inicio.{% endcomment %}
+{% comment %}Tarjeta de prenda reutilizable en catálogo e inicio.{% endcomment %}
 <a href="{{ producto.get_absolute_url }}" class="carta revelar" style="--order: {{ forloop.counter }}">
   <div class="carta-imagen">
     <div class="carta-insignia">
-      {% if producto.estado == 'agotado' %}
+      {% if producto.estado_visual == 'agotado' %}
         <span class="insignia insignia-agotado">Agotado</span>
-      {% elif producto.estado == 'tendencia' %}
+      {% elif producto.estado_visual == 'tendencia' %}
         <span class="insignia insignia-tendencia">Tendencia</span>
-      {% elif producto.estado == 'nuevo' %}
+      {% elif producto.estado_visual == 'nuevo' %}
         <span class="insignia insignia-nuevo">Nuevo</span>
       {% endif %}
     </div>
@@ -18,11 +18,13 @@
     {% endif %}
   </div>
   <div class="carta-cuerpo">
-    <span class="carta-categoria">{{ producto.categoria.nombre }}</span>
+    <span class="carta-categoria">{{ producto.get_tipo_display }}</span>
     <h3 class="carta-nombre">{{ producto.nombre }}</h3>
     <p class="carta-descripcion">{{ producto.descripcion|truncatewords:14 }}</p>
     <div class="carta-pie">
-      <span class="carta-precio">$ {{ producto.precio|floatformat:2 }}</span>
+      <span class="carta-precio" style="font-size:.85rem;color:var(--gris-texto)">
+        {% if producto.tela %}{{ producto.tela }}{% else %}Ficha de diseño{% endif %}
+      </span>
       <span class="carta-accion">Ver más →</span>
     </div>
   </div>

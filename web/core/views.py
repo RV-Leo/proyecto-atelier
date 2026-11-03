@@ -1,10 +1,13 @@
 """Vistas de la aplicación core: inicio y estadísticas del proyecto."""
 
-from django.contrib import messages
-from django.db.models import Count, Sum
-from django.shortcuts import redirect, render
+from collections import Counter
+from types import SimpleNamespace
 
-from catalogo.models import Categoria, Material, Producto
+from django.shortcuts import redirect, render
+from django.utils.text import slugify
+
+from catalogo import api_cliente
+from catalogo.api_cliente import ApiNoDisponible
 from cuentas.models import Coleccion
 from disenador.models import PropuestaDiseno
 from tendencias.models import Tendencia
@@ -26,50 +29,68 @@ def inicio(request):
     if request.user.is_authenticated:
         return redirect('cuentas:panel')
 
-    destacados = list(Producto.objects.filter(es_destacado=True)[:8])
-    nuevas = list(Producto.objects.filter(es_nuevo=True)[:4])
-    if not nuevas:
-        nuevas = list(Producto.objects.order_by('-creado')[:4])
-    portada = next(
-        (p for p in destacados if p.imagen),
-        destacados[0] if destacados else None,
-    )
+    error_api = None
+    try:
+        # La API ordena por fecha de creación descendente: lo primero es lo
+        # último que se registró.
+        prendas = api_cliente.listar_prendas(tamano=12).object_list
+    except ApiNoDisponible as exc:
+        prendas = []
+        error_api = str(exc)
+
+    destacados = prendas[:8]
+    nuevas = prendas[:4]
+    tipos = sorted({p.tipo for p in prendas if p.tipo})
+    categorias = [
+        SimpleNamespace(nombre=tipo.capitalize(), slug=slugify(tipo))
+        for tipo in tipos
+    ]
 
     context = {
-        'categorias': Categoria.objects.all(),
+        'categorias': categorias,
         'destacados': destacados,
         'tendencias_moda': Tendencia.objects.filter(activa=True).order_by('-popularidad')[:6],
         'colecciones': Coleccion.objects.filter(es_recomendada=True)[:4],
         'nuevas': nuevas,
-        'producto_portada': portada,
+        'producto_portada': destacados[0] if destacados else None,
+        'error_api': error_api,
     }
     return render(request, 'core/inicio.html', context)
 
 
 @administrador_requerido
 def informes(request):
-    """Estadísticas reales del proyecto a partir de la base de datos."""
-    total_productos = Producto.objects.count()
-    total_materiales = Material.objects.count()
+    """Estadísticas del proyecto: catálogo e inventario desde la API."""
+    error_api = None
+    try:
+        pagina_prendas = api_cliente.listar_prendas(tamano=100)
+        prendas = pagina_prendas.object_list
+        materiales = api_cliente.listar_materiales()
+    except ApiNoDisponible as exc:
+        error_api = str(exc)
+        pagina_prendas = api_cliente.Pagina.vacia()
+        prendas = []
+        materiales = []
+
+    total_productos = pagina_prendas.paginator.count
+    total_materiales = len(materiales)
     total_tendencias = Tendencia.objects.filter(activa=True).count()
     total_propuestas = PropuestaDiseno.objects.count()
     total_colecciones = Coleccion.objects.count()
 
-    materiales = Material.objects.all()
-    stock_materiales = materiales.aggregate(total=Sum('cantidad'))['total'] or 0
-    agotados = Material.objects.filter(cantidad__lte=0).count()
-    stock_bajo = sum(1 for m in materiales if m.stock_bajo and not m.agotado)
+    stock_materiales = sum(m.cantidad for m in materiales)
+    agotados = sum(1 for m in materiales if m.agotado)
+    stock_bajo = sum(1 for m in materiales if m.stock_bajo)
 
-    productos_por_categoria = list(
-        Categoria.objects.annotate(total=Count('productos')).filter(total__gt=0)
-    )
-    max_categoria = max((c.total for c in productos_por_categoria), default=1)
+    conteo_tipos = Counter((p.tipo or 'Sin tipo').capitalize() for p in prendas)
+    max_categoria = max(conteo_tipos.values(), default=1)
     grafico_categorias = [
-        {'nombre': c.nombre, 'total': c.total, 'ancho': round(c.total / max_categoria * 100)}
-        for c in sorted(productos_por_categoria, key=lambda c: c.total, reverse=True)
+        {'nombre': nombre, 'total': total, 'ancho': round(total / max_categoria * 100)}
+        for nombre, total in conteo_tipos.most_common()
     ]
-    stock_productos = Producto.objects.aggregate(total=Sum('unidades'))['total'] or 0
-    agotados_productos = Producto.objects.filter(unidades=0).count()
+
+    total_tipos = len(conteo_tipos)
+    analizadas = sum(1 for p in prendas if (p.estado or '').upper() == 'ANALIZADA')
 
     tendencias_top = list(Tendencia.objects.filter(activa=True).order_by('-popularidad')[:6])
 
@@ -93,10 +114,11 @@ def informes(request):
         'total_propuestas': total_propuestas,
         'total_colecciones': total_colecciones,
         'grafico_categorias': grafico_categorias,
-        'stock_productos': stock_productos,
-        'agotados_productos': agotados_productos,
+        'total_tipos': total_tipos,
+        'analizadas': analizadas,
         'tendencias_top': tendencias_top,
         'estados': estados,
+        'error_api': error_api,
         'informes_demo': False,
     }
     return render(request, 'core/informes.html', context)

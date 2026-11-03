@@ -1,123 +1,133 @@
-"""Vistas del catálogo de ATELIER: listado, búsqueda, filtros y detalle."""
+"""Vistas del catálogo de ATELIER.
+
+El catálogo y el inventario se leen de la API del backend (Spring Boot). La web
+no consulta PostgreSQL ni guarda prendas o materiales propios: solo mantiene en
+su base las tablas internas de Django (usuarios, sesiones, admin).
+"""
 
 from django.contrib.auth.decorators import login_required
-from django.core.paginator import Paginator
-from django.db.models import Q
-from django.shortcuts import get_object_or_404, render
+from django.http import Http404
+from django.shortcuts import render
 
-from .models import Categoria, Material, Producto
+from . import api_cliente
+from .api_cliente import ApiNoDisponible
 
 POR_PAGINA = 12
 
 
+def _entero(valor, defecto=1):
+    try:
+        return max(int(valor), 1)
+    except (TypeError, ValueError):
+        return defecto
+
+
 def lista(request):
-    """Catálogo con búsqueda por nombre/descripción y filtros."""
-    productos = Producto.objects.all()
-    buscador = request.GET
-    q = buscador.get('q', '').strip()
-    categoria_slug = buscador.get('categoria', '').strip()
-    tipo = buscador.get('tipo', '').strip()
-    temporada = buscador.get('temporada', '').strip()
-    estilo = buscador.get('estilo', '').strip()
+    """Catálogo con búsqueda y filtros, servido por la API."""
+    filtros = {
+        'q': request.GET.get('q', '').strip(),
+        'tipo': request.GET.get('tipo', '').strip(),
+        'estilo': request.GET.get('estilo', '').strip(),
+        'estado': request.GET.get('estado', '').strip(),
+    }
+    activos = {clave: valor for clave, valor in filtros.items() if valor}
 
-    if q:
-        productos = productos.filter(
-            Q(nombre__icontains=q) | Q(descripcion__icontains=q)
+    error_api = None
+    tipos, estilos = [], []
+    try:
+        tipos, estilos = api_cliente.opciones_catalogo()
+    except ApiNoDisponible as exc:
+        error_api = str(exc)
+
+    try:
+        pagina = api_cliente.listar_prendas(
+            pagina=_entero(request.GET.get('pagina')),
+            tamano=POR_PAGINA,
+            **activos,
         )
-    if categoria_slug:
-        productos = productos.filter(categoria__slug=categoria_slug)
-    if tipo:
-        productos = productos.filter(tipo=tipo)
-    if temporada:
-        productos = productos.filter(temporada=temporada)
-    if estilo:
-        productos = productos.filter(estilo__iexact=estilo)
-
-    categoria_activa = None
-    if categoria_slug:
-        categoria_activa = get_object_or_404(Categoria, slug=categoria_slug)
-
-    paginator = Paginator(productos, POR_PAGINA)
-    pagina = paginator.get_page(buscador.get('pagina'))
-
-    estilos = list(
-        Producto.objects.exclude(estilo='').values_list('estilo', flat=True)
-        .distinct().order_by('estilo')
-    )
+    except ApiNoDisponible as exc:
+        error_api = error_api or str(exc)
+        pagina = api_cliente.Pagina.vacia()
 
     context = {
         'pagina': pagina,
-        'categorias': Categoria.objects.all(),
-        'categoria_activa': categoria_activa,
+        'tipos': tipos,
         'estilos': estilos,
-        'filtros': {
-            'q': q,
-            'tipo': tipo,
-            'temporada': temporada,
-            'estilo': estilo,
-            'categoria': categoria_slug,
-        },
+        'filtros': filtros,
+        'error_api': error_api,
         'resumen': _resumen_paginacion(pagina),
     }
     return render(request, 'catalogo/lista.html', context)
 
 
 def detalle(request, slug):
-    """Detalle de un producto con relacionados y estado de favorito."""
-    producto = get_object_or_404(Producto, slug=slug)
-    relacionados = (
-        Producto.objects.filter(categoria=producto.categoria)
-        .exclude(pk=producto.pk)[:4]
-    )
-    es_favorito = False
-    if request.user.is_authenticated:
-        es_favorito = request.user.favoritos.filter(producto=producto).exists()
+    """Detalle de una prenda y prendas del mismo tipo."""
+    try:
+        producto = api_cliente.obtener_por_slug(slug)
+    except ApiNoDisponible as exc:
+        return render(
+            request,
+            'catalogo/detalle.html',
+            {'producto': None, 'relacionados': [], 'error_api': str(exc)},
+            status=503,
+        )
+
+    if producto is None:
+        raise Http404('No existe la prenda %s' % slug)
+
+    relacionados = []
+    try:
+        pagina = api_cliente.listar_prendas(
+            pagina=1, tamano=4, tipo=producto.tipo or None
+        )
+        relacionados = [p for p in pagina.object_list if p.slug != producto.slug][:4]
+    except ApiNoDisponible:
+        pass
 
     context = {
         'producto': producto,
         'relacionados': relacionados,
-        'es_favorito': es_favorito,
+        # Los favoritos siguen apuntando a la tabla local de productos, que ya
+        # no se usa para el catálogo. Se ocultan mientras la API no exponga un
+        # identificador estable para guardarlos.
+        'favoritos_disponibles': False,
+        'error_api': None,
     }
     return render(request, 'catalogo/detalle.html', context)
 
 
 @login_required
 def inventario(request):
-    """Inventario de materiales y telas con estado del stock."""
-    materiales = Material.objects.all()
-    estado = request.GET.get('estado', '').strip()
+    """Inventario de materiales y telas, servido por la API."""
     q = request.GET.get('q', '').strip()
+    estado = request.GET.get('estado', '').strip()
 
-    if q:
-        materiales = materiales.filter(
-            Q(nombre__icontains=q)
-            | Q(categoria__icontains=q)
-            | Q(color__icontains=q)
-            | Q(tipo_tela__icontains=q)
-        )
+    error_api = None
+    todos, materiales = [], []
+    try:
+        todos = api_cliente.listar_materiales()
+        if q or estado:
+            materiales = api_cliente.listar_materiales(q=q or None, estado=estado or None)
+        else:
+            materiales = todos
+    except ApiNoDisponible as exc:
+        error_api = str(exc)
 
-    materiales = list(materiales)
-    if estado == 'agotado':
-        materiales = [m for m in materiales if m.agotado]
-    elif estado == 'bajo':
-        materiales = [m for m in materiales if m.stock_bajo]
-    elif estado == 'disponible':
-        materiales = [m for m in materiales if m.disponible]
-
-    categorias = list(
-        Material.objects.values_list('categoria', flat=True).distinct().order_by('categoria')
-    )
-    disponible = sum(1 for m in Material.objects.all() if m.disponible)
-    bajo = sum(1 for m in Material.objects.all() if m.stock_bajo)
-    agotado = Material.objects.filter(cantidad__lte=0).count()
+    totales = {
+        'disponible': sum(1 for m in todos if m.disponible),
+        'bajo': sum(1 for m in todos if m.stock_bajo),
+        'agotado': sum(1 for m in todos if m.agotado),
+    }
+    categorias = sorted({m.categoria for m in todos if m.categoria})
 
     context = {
         'materiales': materiales,
         'categorias': categorias,
         'estado_activo': estado,
         'q': q,
-        'totales': {'disponible': disponible, 'bajo': bajo, 'agotado': agotado},
+        'totales': totales,
         'total': len(materiales),
+        'error_api': error_api,
     }
     return render(request, 'catalogo/inventario.html', context)
 
@@ -125,8 +135,9 @@ def inventario(request):
 def _resumen_paginacion(pagina):
     if not pagina.has_other_pages():
         return None
-    inicio = (pagina.number - 1) * POR_PAGINA + 1
-    fin = min(pagina.number * POR_PAGINA, pagina.paginator.count)
+    tamano = pagina.tamano or POR_PAGINA
+    inicio = (pagina.number - 1) * tamano + 1
+    fin = min(pagina.number * tamano, pagina.paginator.count)
     return {
         'inicio': inicio,
         'fin': fin,

@@ -3,6 +3,21 @@
 
 {% block contenido %}
 
+  {% if error_api %}
+    <section class="seccion" style="padding-bottom:0">
+      <div class="contenedor">
+        <div class="nota-demo" role="alert">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+          <div>
+            <strong>El catálogo no está disponible.</strong>
+            {{ error_api }}
+            Revisa que el backend esté en marcha y que <code>API_BASE_URL</code> apunte a él.
+          </div>
+        </div>
+      </div>
+    </section>
+  {% endif %}
+
   <!-- Hero editorial -->
   <section class="hero hero-editorial">
     <div class="contenedor hero-editorial-grid">
@@ -43,7 +58,7 @@
         </div>
         <div class="ventaja revelar">
           <h3>Catálogo transparente</h3>
-          <p>Prendas, telas y avíos con precio, composición y disponibilidad para saber qué es producible.</p>
+          <p>Prendas con su tipo, estilo, colores y tela, tal como están registradas en la API del backend.</p>
         </div>
         <div class="ventaja revelar">
           <h3>Tendencias de temporada</h3>
@@ -107,7 +122,7 @@
       <div class="seccion-cabecera">
         <div>
           <h2 class="seccion-titulo">Piezas destacadas</h2>
-          <p class="seccion-subtitulo" style="margin-bottom:0">Prendas y telas seleccionadas por el equipo ATELIER.</p>
+          <p class="seccion-subtitulo" style="margin-bottom:0">Prendas registradas en la API de ATELIER.</p>
         </div>
         <a class="enlace-cabecera" href="{% url 'catalogo:lista' %}">Todo el catálogo →</a>
       </div>
@@ -159,7 +174,7 @@
       <div class="seccion-cabecera">
         <div>
           <h2 class="seccion-titulo">Novedades del catálogo</h2>
-          <p class="seccion-subtitulo" style="margin-bottom:0">Lo último en llegar a la plataforma.</p>
+          <p class="seccion-subtitulo" style="margin-bottom:0">Lo último registrado en el catálogo del backend.</p>
         </div>
       </div>
       <div class="rejilla">
