@@ -4,6 +4,9 @@ Si un objeto ya existe no se duplica ni se sobrescribe; las imágenes se
 generan solo la primera vez. El superusuario de desarrollo se crea si falta.
 """
 
+from pathlib import Path
+
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 
@@ -154,10 +157,14 @@ class Command(BaseCommand):
                 Producto, {'nombre': nombre}, valores, creados,
             )
             if creado and not objeto.imagen:
-                ruta = placeholder.generar_textura_tela(
-                    f'productos/{objeto.slug}', color_inicio=_color_inicio(composicion, color)
-                )
-                objeto.imagen = ruta
+                foto = Path(settings.MEDIA_ROOT) / 'productos' / f'{objeto.slug}.jpg'
+                if foto.is_file():
+                    objeto.imagen = f'productos/{objeto.slug}.jpg'
+                else:
+                    objeto.imagen = placeholder.generar_textura_tela(
+                        f'productos/{objeto.slug}',
+                        color_inicio=_color_inicio(composicion, color),
+                    )
                 objeto.save(update_fields=['imagen'])
 
     def _materiales(self, creados):
