@@ -10,7 +10,7 @@ import random
 
 from django.conf import settings
 
-from catalogo.models import Material
+from catalogo.repositories import CatalogoRepository
 from core.placeholder import generar_textura_tela
 
 SUFIJOS_DESCRIPCION = [
@@ -43,7 +43,8 @@ class ProveedorDemo(ProveedorDiseno):
         self.esfuerzo = int(esfuerzo)
 
     def _materiales_disponibles(self, paleta):
-        materiales = list(Material.objects.filter(cantidad__gt=0))
+        catalogo = CatalogoRepository()
+        materiales = list(catalogo.materiales_disponibles())
         if not materiales:
             return [], False, False
         relacionados = []
@@ -52,7 +53,7 @@ class ProveedorDemo(ProveedorDiseno):
                 relacionados.append(m)
         stock = len(materiales)
         hay_stock_bajo = any(m.stock_bajo for m in materiales)
-        hay_agotados = Material.objects.filter(cantidad__lte=0).count() > 0
+        hay_agotados = catalogo.existen_materiales_agotados()
         return (relacionados or materiales[:3]), hay_stock_bajo, hay_agotados
 
     def generar(self, resumen, opciones):

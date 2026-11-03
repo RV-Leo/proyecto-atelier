@@ -59,6 +59,10 @@ atelier/
 └── docs/      → Documentación del proyecto
 ```
 
+La aplicación web separa modelos, repositorios, servicios y vistas. Consulta
+[`docs/arquitectura-web.md`](docs/arquitectura-web.md) para ver las capas y sus
+responsabilidades.
+
 ## Empezar
 
 1. Clona el repositorio:
