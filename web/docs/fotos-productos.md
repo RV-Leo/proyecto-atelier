@@ -33,20 +33,20 @@ Las portadas de las cuatro colecciones recomendadas reutilizan fotos de este cat
 
 ## Imágenes de tendencias
 
-Las imágenes de tendencias muestran telas, tejidos y materiales en encuadre panorámico 16:10; no incluyen modelos. Cada composición usa un acercamiento textil y una paleta de cuatro muestras. Los recortes mantienen la proporción de origen sin estirar. La tabla remite a la foto base y su atribución Pexels arriba.
+Cada tendencia usa una foto de tela o material distinta, sin personas. Se conserva el encuadre panorámico 16:10 mediante recorte proporcional, sin estirar. Las imágenes son de Pexels y se guardan en `web/media/tendencias/`.
 
-| Tendencia | Foto del catálogo |
-|---|---|
-| Azul marino profundo | `gabardina-tecnica-impermeable` (matiz azul) |
-| Terracota cálida | `seda-saten-duquesa` (matiz cálido) |
-| Verde oliva militar | `gasa-de-viscosa-estampada` |
-| Seda satinada | `seda-saten-duquesa` |
-| Lino arrugado | `lino-estampado-primavera` |
-| Lana de cachemira | `lana-cachemira-molton` |
-| Minimalismo sobrio | `camisa-de-algodon-clasica` |
-| Oversize editorial | `lino-estampado-primavera` con trama a cuadros editorial |
-| Boho contemporáneo | `gasa-de-viscosa-estampada` (matiz cálido) |
-| Vestidos fluidos | `lino-estampado-primavera` (matiz salvia) |
-| Sastrería relajada | `lana-cachemira-molton` (matiz pizarra) |
-| Primavera-Verano 2026 | `algodon-organico-popelina` |
-| Otoño-Invierno 2026 | `lana-cachemira-molton` (matiz cálido) |
+| Tendencia | Foto Pexels | Autor | Fuente |
+|---|---:|---|---|
+| Azul marino profundo | 18190568 | Steve A Johnson | [Pexels](https://www.pexels.com/photo/close-up-of-a-navy-blue-fabric-18190568/) |
+| Terracota cálida | 1460890 | Engin Akyurt | [Pexels](https://www.pexels.com/photo/close-up-photo-of-brown-textile-1460890/) |
+| Verde oliva militar | 7641221 | Eva Bronzini | [Pexels](https://www.pexels.com/photo/green-textile-in-close-up-photography-7641221/) |
+| Seda satinada | 35962175 | Rafael Minguet Delgado | [Pexels](https://www.pexels.com/photo/elegant-red-satin-fabric-with-luxurious-folds-35962175/) |
+| Lino arrugado | 8774406 | Anna Maxelante | [Pexels](https://www.pexels.com/photo/close-up-of-linen-fabric-8774406/) |
+| Lana de cachemira | 36280938 | Any Melnic | [Pexels](https://www.pexels.com/photo/close-up-of-textured-beige-wool-fabric-swirl-36280938/) |
+| Minimalismo sobrio | 6979822 | Roman Odintsov | [Pexels](https://www.pexels.com/photo/close-up-of-a-fabric-6979822/) |
+| Oversize editorial | 36605392 | Valentin Ivantsov | [Pexels](https://www.pexels.com/photo/colorful-tartan-pattern-fabric-texture-36605392/) |
+| Boho contemporáneo | 29217565 | Olga Kovalski | [Pexels](https://www.pexels.com/photo/vibrant-green-fabric-folds-in-artistic-pattern-29217565/) |
+| Vestidos fluidos | 8008328 | Tamanna Rumee | [Pexels](https://www.pexels.com/photo/close-up-shot-of-a-blue-cloth-8008328/) |
+| Sastrería relajada | 28460324 | Beatriz Vilaça | [Pexels](https://www.pexels.com/photo/close-up-of-black-fabric-rolls-stacked-in-factory-28460324/) |
+| Primavera-Verano 2026 | 32795036 | Dijana Tandel | [Pexels](https://www.pexels.com/photo/cotton-boll-on-beige-linen-fabric-close-up-32795036/) |
+| Otoño-Invierno 2026 | 8753304 | Tamanna Rumee | [Pexels](https://www.pexels.com/photo/crumpled-brown-fabric-8753304/) |
