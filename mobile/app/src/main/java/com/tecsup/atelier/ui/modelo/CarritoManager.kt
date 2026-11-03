@@ -6,20 +6,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
 object CarritoManager {
-    private val _items = MutableStateFlow<List<ItemCarrito>>(
-        listOf(
-            ItemCarrito(
-                producto = DatosFake.productos[0],
-                talla = "M",
-                cantidad = 1
-            ),
-            ItemCarrito(
-                producto = DatosFake.productos[1],
-                talla = "32",
-                cantidad = 1
-            )
-        )
-    )
+    private val _items = MutableStateFlow<List<ItemCarrito>>(emptyList())
     val items: StateFlow<List<ItemCarrito>> = _items.asStateFlow()
 
     fun agregarProducto(producto: Producto, talla: String = "M", cantidad: Int = 1) {

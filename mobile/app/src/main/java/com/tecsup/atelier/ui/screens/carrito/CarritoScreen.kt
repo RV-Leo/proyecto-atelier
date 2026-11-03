@@ -63,6 +63,7 @@ fun CarritoScreen(
     val descuento = if (cuponAplicado) subtotal * 0.20 else 0.0
     val envio = if (subtotal > 150.0 || itemsCarrito.isEmpty()) 0.0 else 15.0
     val total = (subtotal - descuento) + envio
+    val todosSinPrecio = itemsCarrito.isNotEmpty() && itemsCarrito.all { !it.producto.tienePrecio }
 
     Box(
         modifier = Modifier
@@ -224,19 +225,35 @@ fun CarritoScreen(
 
                                 Spacer(modifier = Modifier.height(12.dp))
 
-                                FilaMontoResumen(etiqueta = "Subtotal", monto = "S/ ${"%.2f".format(subtotal)}")
+                                FilaMontoResumen(
+                                    etiqueta = "Subtotal",
+                                    monto = if (todosSinPrecio) "Por confirmar" else "S/ ${"%.2f".format(subtotal)}"
+                                )
                                 if (cuponAplicado) {
                                     FilaMontoResumen(
                                         etiqueta = "Descuento (20% OFF)",
-                                        monto = "- S/ ${"%.2f".format(descuento)}",
+                                        monto = if (todosSinPrecio) "Por confirmar" else "- S/ ${"%.2f".format(descuento)}",
                                         colorMonto = MaterialTheme.colorScheme.secondary
                                     )
                                 }
                                 FilaMontoResumen(
                                     etiqueta = "Envío",
-                                    monto = if (envio == 0.0) "¡Gratis!" else "S/ ${"%.2f".format(envio)}",
+                                    monto = when {
+                                        todosSinPrecio -> "Por confirmar"
+                                        envio == 0.0 -> "¡Gratis!"
+                                        else -> "S/ ${"%.2f".format(envio)}"
+                                    },
                                     colorMonto = if (envio == 0.0) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface
                                 )
+
+                                if (todosSinPrecio) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "La API todavía no expone precios. Se confirmarán al procesar tu pedido.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
 
                                 Spacer(modifier = Modifier.height(10.dp))
                                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -244,7 +261,7 @@ fun CarritoScreen(
 
                                 FilaMontoResumen(
                                     etiqueta = "Total A Pagar",
-                                    monto = "S/ ${"%.2f".format(total)}",
+                                    monto = if (todosSinPrecio) "Por confirmar" else "S/ ${"%.2f".format(total)}",
                                     esTotal = true
                                 )
                             }
@@ -277,7 +294,7 @@ fun CarritoScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "S/ ${"%.2f".format(total)}",
+                            text = if (todosSinPrecio) "Por confirmar" else "S/ ${"%.2f".format(total)}",
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -382,8 +399,16 @@ private fun TarjetaItemCarrito(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "S/ ${"%.2f".format(item.producto.precio * item.cantidad)}",
-                        style = MaterialTheme.typography.titleMedium,
+                        text = if (item.producto.tienePrecio) {
+                            "S/ ${"%.2f".format(item.producto.precio * item.cantidad)}"
+                        } else {
+                            "Precio por confirmar"
+                        },
+                        style = if (item.producto.tienePrecio) {
+                            MaterialTheme.typography.titleMedium
+                        } else {
+                            MaterialTheme.typography.labelSmall
+                        },
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )

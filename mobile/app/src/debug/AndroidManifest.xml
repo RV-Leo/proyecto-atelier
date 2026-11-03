@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+        Permite HTTP sin cifrar solo en compilaciones de desarrollo para
+        conectar con el backend local (http://10.0.2.2:8080).
+        En release se debe usar HTTPS.
+    -->
+    <application android:usesCleartextTraffic="true" />
+
+</manifest>

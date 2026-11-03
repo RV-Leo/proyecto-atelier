@@ -58,6 +58,8 @@ fun ConfirmacionPedidoScreen(
     val subtotal = CarritoManager.obtenerSubtotal()
     val envio = CarritoManager.obtenerEnvio()
     val total = CarritoManager.obtenerTotal()
+    val todosSinPrecio = CarritoManager.items.value.isNotEmpty() &&
+            CarritoManager.items.value.all { !it.producto.tienePrecio }
 
     if (pedidoExitoso) {
         // Vista de Éxito al Confirmar Compra
@@ -242,19 +244,34 @@ fun ConfirmacionPedidoScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("Subtotal", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("S/ ${"%.2f".format(subtotal)}", fontWeight = FontWeight.Bold)
+                            Text(
+                                if (todosSinPrecio) "Por confirmar" else "S/ ${"%.2f".format(subtotal)}",
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("Envío Express", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(if (envio == 0.0) "Gratis" else "S/ ${"%.2f".format(envio)}", fontWeight = FontWeight.Bold)
+                            Text(
+                                when {
+                                    todosSinPrecio -> "Por confirmar"
+                                    envio == 0.0 -> "Gratis"
+                                    else -> "S/ ${"%.2f".format(envio)}"
+                                },
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("Total", fontWeight = FontWeight.Bold)
-                            Text("S/ ${"%.2f".format(total)}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, fontSize = 18.sp)
+                            Text(
+                                if (todosSinPrecio) "Por confirmar" else "S/ ${"%.2f".format(total)}",
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 18.sp
+                            )
                         }
                     }
                 }
@@ -281,7 +298,15 @@ fun ConfirmacionPedidoScreen(
                         ),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Confirmar y Pagar S/ ${"%.2f".format(total)} →", fontWeight = FontWeight.Bold, modifier = Modifier.padding(vertical = 4.dp))
+                        Text(
+                            text = if (todosSinPrecio) {
+                                "Confirmar pedido →"
+                            } else {
+                                "Confirmar y Pagar S/ ${"%.2f".format(total)} →"
+                            },
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
                     }
                 }
             }

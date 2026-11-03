@@ -47,8 +47,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tecsup.atelier.R
-import com.tecsup.atelier.ui.modelo.DatosFake
 import com.tecsup.atelier.ui.modelo.Producto
+import com.tecsup.atelier.ui.modelo.coloresDesde
 import com.tecsup.atelier.ui.theme.AtelierTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,18 +61,24 @@ fun DetalleProductoScreen(
     var esFavorito by remember { mutableStateOf(producto.esFavorito) }
     var tallaSeleccionada by remember { mutableStateOf("M") }
     var cantidad by remember { mutableIntStateOf(1) }
-    
+
     val opcionesColor = remember(producto) {
-        listOf(
-            Color(producto.colorHex),
-            Color(0xFF1E1E1E),
-            Color(0xFF2C3E50),
-            Color(0xFFD7CCC8)
-        )
+        val desdeApi = coloresDesde(producto.colores).map { Color(it) }
+        if (desdeApi.isEmpty()) listOf(Color(producto.colorHex)) else desdeApi
     }
-    var colorSeleccionadoIndice by remember { mutableIntStateOf(0) }
+    var colorSeleccionadoIndice by remember(producto) { mutableIntStateOf(0) }
 
     val tallasDisponibles = listOf("S", "M", "L", "XL", "XXL")
+
+    val especificaciones = remember(producto) {
+        listOf(
+            "Tipo" to producto.nombreCategoria,
+            "Tela" to producto.tela,
+            "Colores" to producto.colores,
+            "Estilo" to producto.estilo,
+            "Estado" to producto.estadoLegible
+        ).filter { (_, valor) -> valor.isNotBlank() && valor != "—" }
+    }
 
     Box(
         modifier = Modifier
@@ -217,44 +223,54 @@ fun DetalleProductoScreen(
                     color = MaterialTheme.colorScheme.onBackground
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                if (producto.calificacion > 0) {
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                // Fila de Calificación, Reseñas y Unidades
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "★ ${producto.calificacion}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "(${producto.cantidadResenas} reseñas) • 320+ vendidos",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "★ ${producto.calificacion}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "(${producto.cantidadResenas} reseñas)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Fila de Precio
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "S/ ${"%.2f".format(producto.precio)}",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-
-                    producto.precioOriginal?.let { orig ->
-                        Spacer(modifier = Modifier.width(12.dp))
+                // La API todavía no expone precios: no se inventa un monto.
+                if (producto.tienePrecio) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "S/ ${"%.2f".format(orig)}",
-                            style = MaterialTheme.typography.titleMedium,
-                            textDecoration = TextDecoration.LineThrough,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = "S/ ${"%.2f".format(producto.precio)}",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
                         )
+
+                        producto.precioOriginal?.let { orig ->
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = "S/ ${"%.2f".format(orig)}",
+                                style = MaterialTheme.typography.titleMedium,
+                                textDecoration = TextDecoration.LineThrough,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
+                } else {
+                    Text(
+                        text = "Precio por confirmar",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -288,6 +304,15 @@ fun DetalleProductoScreen(
                                 .clickable { colorSeleccionadoIndice = idx }
                         )
                     }
+                }
+
+                if (producto.colores.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = producto.colores,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -383,45 +408,52 @@ fun DetalleProductoScreen(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // 7. Descripción & Especificaciones Técnicas Textiles
-                Text(
-                    text = "Descripción del Producto",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
+                // 7. Descripción y especificaciones que sí expone la API
+                if (producto.descripcion.isNotBlank()) {
+                    Text(
+                        text = "Descripción del Producto",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                Text(
-                    text = producto.descripcion,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    lineHeight = 22.sp
-                )
+                    Text(
+                        text = producto.descripcion,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 22.sp
+                    )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
 
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "Especificaciones del Tejido",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text("🧵 Material: 100% Algodón Pima Peruano", fontSize = 13.sp)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("📐 Ajuste: Slim Fit anatómico", fontSize = 13.sp)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("🧼 Cuidado: Lavado a máquina en agua fría", fontSize = 13.sp)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("🇵🇪 Origen: Confección de alta calidad en Perú", fontSize = 13.sp)
+                if (especificaciones.isNotEmpty()) {
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = "Especificaciones de la Prenda",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            especificaciones.forEachIndexed { index, (etiqueta, valor) ->
+                                if (index > 0) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                }
+                                Text(
+                                    text = "$etiqueta: $valor",
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -444,12 +476,16 @@ fun DetalleProductoScreen(
             ) {
                 Column {
                     Text(
-                        text = "Precio Total",
+                        text = if (producto.tienePrecio) "Precio Total" else "Precio",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "S/ ${"%.2f".format(producto.precio * cantidad)}",
+                        text = if (producto.tienePrecio) {
+                            "S/ ${"%.2f".format(producto.precio * cantidad)}"
+                        } else {
+                            "Por confirmar"
+                        },
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
@@ -476,12 +512,24 @@ fun DetalleProductoScreen(
     }
 }
 
+private val productoPreview = Producto(
+    id = "28",
+    nombre = "Blusa lino natural",
+    idCategoria = "blusa",
+    nombreCategoria = "Blusa",
+    descripcion = "Blusa fresca de lino natural para climas cálidos.",
+    slug = "blusa-lino-natural",
+    tela = "Lino",
+    estilo = "Casual",
+    colores = "Natural",
+    estado = "ANALIZADA",
+    colorHex = 0xFFD9CBB3
+)
+
 @Preview(showBackground = true)
 @Composable
 fun DetalleProductoScreenPreview() {
     AtelierTheme {
-        DetalleProductoScreen(
-            producto = DatosFake.productos.first()
-        )
+        DetalleProductoScreen(producto = productoPreview)
     }
 }

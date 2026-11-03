@@ -22,8 +22,10 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -34,8 +36,10 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,9 +57,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tecsup.atelier.R
+import com.tecsup.atelier.data.repository.RepositorioCatalogoImpl
 import com.tecsup.atelier.ui.modelo.CarritoManager
 import com.tecsup.atelier.ui.modelo.Categoria
-import com.tecsup.atelier.ui.modelo.DatosFake
 import com.tecsup.atelier.ui.modelo.Producto
 import com.tecsup.atelier.ui.theme.AtelierTheme
 import kotlinx.coroutines.launch
@@ -69,22 +73,68 @@ fun HomeScreen(
 ) {
     var idCategoriaSeleccionada by remember { mutableStateOf("all") }
     var textoBusqueda by remember { mutableStateOf("") }
-    
+    var productos by remember { mutableStateOf<List<Producto>>(emptyList()) }
+    var cargando by remember { mutableStateOf(true) }
+    var errorApi by remember { mutableStateOf<String?>(null) }
+    var intento by remember { mutableIntStateOf(0) }
+
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+    val repositorio = remember { RepositorioCatalogoImpl() }
 
-    val favoritosState = remember {
-        mutableStateMapOf<String, Boolean>().apply {
-            DatosFake.productos.forEach { this[it.id] = it.esFavorito }
+    LaunchedEffect(intento) {
+        cargando = true
+        errorApi = null
+        repositorio.listarPrendas(pagina = 1, tamano = 100)
+            .onSuccess { pagina ->
+                productos = pagina.items
+                cargando = false
+            }
+            .onFailure { fallo ->
+                productos = emptyList()
+                errorApi = fallo.message ?: "No se pudo conectar con la API."
+                cargando = false
+            }
+    }
+
+    val categorias = remember(productos) {
+        val tipos = productos
+            .map { Categoria(it.idCategoria, it.nombreCategoria) }
+            .distinctBy { it.id }
+            .sortedBy { it.nombre }
+        listOf(Categoria("all", "Todos")) + tipos
+    }
+
+    LaunchedEffect(categorias) {
+        if (categorias.none { it.id == idCategoriaSeleccionada }) {
+            idCategoriaSeleccionada = "all"
         }
     }
 
-    val productosFiltrados = remember(idCategoriaSeleccionada, textoBusqueda) {
-        DatosFake.productos.filter { producto ->
-            val coincideCategoria = idCategoriaSeleccionada == "all" || producto.idCategoria == idCategoriaSeleccionada
-            val coincideBusqueda = textoBusqueda.isBlank() ||
-                    producto.nombre.contains(textoBusqueda, ignoreCase = true) ||
-                    producto.nombreCategoria.contains(textoBusqueda, ignoreCase = true)
+    val favoritosState = remember { mutableStateMapOf<String, Boolean>() }
+
+    LaunchedEffect(productos) {
+        productos.forEach { producto ->
+            if (favoritosState[producto.id] == null) {
+                favoritosState[producto.id] = producto.esFavorito
+            }
+        }
+    }
+
+    val productosFiltrados = remember(productos, idCategoriaSeleccionada, textoBusqueda) {
+        val consulta = textoBusqueda.trim()
+        productos.filter { producto ->
+            val coincideCategoria = idCategoriaSeleccionada == "all" ||
+                    producto.idCategoria == idCategoriaSeleccionada
+            val coincideBusqueda = consulta.isBlank() ||
+                    listOf(
+                        producto.nombre,
+                        producto.nombreCategoria,
+                        producto.tela,
+                        producto.estilo,
+                        producto.colores,
+                        producto.descripcion
+                    ).any { it.contains(consulta, ignoreCase = true) }
             coincideCategoria && coincideBusqueda
         }
     }
@@ -113,7 +163,7 @@ fun HomeScreen(
                 BannerHeroeMinimalista()
             }
 
-            // 3. Categorías (Pill Tabs)
+            // 3. Categorías (Pill Tabs) derivadas de los tipos de prenda de la API
             item(span = { GridItemSpan(2) }) {
                 Column {
                     Text(
@@ -126,7 +176,7 @@ fun HomeScreen(
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        items(DatosFake.categorias, key = { it.id }) { categoria ->
+                        items(categorias, key = { it.id }) { categoria ->
                             TabCategoriaMinimalista(
                                 categoria = categoria,
                                 estaSeleccionado = categoria.id == idCategoriaSeleccionada,
@@ -147,49 +197,76 @@ fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (idCategoriaSeleccionada == "all") "Colección Exclusiva" else "Categoría: ${idCategoriaSeleccionada.replaceFirstChar { it.uppercase() }}",
+                        text = if (idCategoriaSeleccionada == "all") {
+                            "Colección Exclusiva"
+                        } else {
+                            "Categoría: ${categorias.firstOrNull { it.id == idCategoriaSeleccionada }?.nombre ?: idCategoriaSeleccionada}"
+                        },
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "${productosFiltrados.size} prendas",
+                        text = when {
+                            cargando -> "Cargando..."
+                            errorApi != null -> "Sin conexión"
+                            else -> "${productosFiltrados.size} prendas"
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            // 5. Grid de Productos (2 Columnas)
-            if (productosFiltrados.isEmpty()) {
-                item(span = { GridItemSpan(2) }) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(40.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "No se encontraron prendas.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+            // 5. Contenido del catálogo
+            when {
+                cargando -> {
+                    item(span = { GridItemSpan(2) }) {
+                        EstadoCargandoCatalogo()
+                    }
+                }
+
+                errorApi != null -> {
+                    item(span = { GridItemSpan(2) }) {
+                        EstadoErrorCatalogo(
+                            mensaje = errorApi!!,
+                            alReintentar = { intento++ }
                         )
                     }
                 }
-            } else {
-                items(productosFiltrados, key = { it.id }) { producto ->
-                    val esFav = favoritosState[producto.id] ?: false
-                    TarjetaProductoMinimalista(
-                        producto = producto,
-                        esFavorito = esFav,
-                        alAlternarFavorito = { favoritosState[producto.id] = !esFav },
-                        alAgregarAlCarrito = {
-                            CarritoManager.agregarProducto(producto)
-                            coroutineScope.launch {
-                                snackbarHostState.showSnackbar("Añadido al carrito: ${producto.nombre}")
-                            }
-                        },
-                        alHacerClic = { alSeleccionarProducto(producto) }
-                    )
+
+                productosFiltrados.isEmpty() -> {
+                    item(span = { GridItemSpan(2) }) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(40.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "No se encontraron prendas.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                else -> {
+                    items(productosFiltrados, key = { it.id }) { producto ->
+                        val esFav = favoritosState[producto.id] ?: false
+                        TarjetaProductoMinimalista(
+                            producto = producto,
+                            esFavorito = esFav,
+                            alAlternarFavorito = { favoritosState[producto.id] = !esFav },
+                            alAgregarAlCarrito = {
+                                CarritoManager.agregarProducto(producto)
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("Añadido al carrito: ${producto.nombre}")
+                                }
+                            },
+                            alHacerClic = { alSeleccionarProducto(producto) }
+                        )
+                    }
                 }
             }
 
@@ -204,6 +281,59 @@ fun HomeScreen(
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 80.dp)
         )
+    }
+}
+
+@Composable
+private fun EstadoCargandoCatalogo() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 48.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Cargando prendas desde la API...",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun EstadoErrorCatalogo(
+    mensaje: String,
+    alReintentar: () -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "No pudimos cargar el catálogo",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Verifica que el backend esté encendido en la URL configurada.\n$mensaje",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(onClick = alReintentar, shape = RoundedCornerShape(14.dp)) {
+                Text("Reintentar")
+            }
+        }
     }
 }
 
@@ -300,7 +430,7 @@ private fun EncabezadoEditorialMinimalista(
         OutlinedTextField(
             value = textoBusqueda,
             onValueChange = alCambiarTextoBusqueda,
-            placeholder = { Text("Buscar polos, jeans, casacas...") },
+            placeholder = { Text("Buscar prendas, telas o estilos...") },
             leadingIcon = {
                 Icon(
                     painter = painterResource(R.drawable.ic_search),
@@ -344,7 +474,7 @@ private fun BannerHeroeMinimalista() {
                     shape = RoundedCornerShape(6.dp)
                 ) {
                     Text(
-                        text = "TEMPORADA 2025",
+                        text = "CATÁLOGO ATELIER",
                         color = Color.White,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
@@ -355,7 +485,7 @@ private fun BannerHeroeMinimalista() {
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "20% OFF en Algodón Pima",
+                    text = "Prendas creadas con IA",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -364,7 +494,7 @@ private fun BannerHeroeMinimalista() {
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "Descubre la máxima calidad y confort peruano",
+                    text = "Explora el catálogo que publica la API de Atelier",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.8f)
                 )
@@ -488,16 +618,21 @@ private fun TarjetaProductoMinimalista(
                         style = MaterialTheme.typography.labelSmall,
                         fontSize = 9.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
                     )
 
-                    Text(
-                        text = "★ ${producto.calificacion}",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    if (producto.calificacion > 0) {
+                        Text(
+                            text = "★ ${producto.calificacion}",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(2.dp))
@@ -510,6 +645,17 @@ private fun TarjetaProductoMinimalista(
                     overflow = TextOverflow.Ellipsis
                 )
 
+                if (producto.tela.isNotBlank()) {
+                    Text(
+                        text = "Tela: ${producto.tela}",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Row(
@@ -518,20 +664,29 @@ private fun TarjetaProductoMinimalista(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text(
-                            text = "S/ ${"%.2f".format(producto.precio)}",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-
-                        producto.precioOriginal?.let { orig ->
+                        if (producto.tienePrecio) {
                             Text(
-                                text = "S/ ${"%.2f".format(orig)}",
-                                style = MaterialTheme.typography.bodySmall,
-                                textDecoration = TextDecoration.LineThrough,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 10.sp
+                                text = "S/ ${"%.2f".format(producto.precio)}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+
+                            producto.precioOriginal?.let { orig ->
+                                Text(
+                                    text = "S/ ${"%.2f".format(orig)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    textDecoration = TextDecoration.LineThrough,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 10.sp
+                                )
+                            }
+                        } else {
+                            Text(
+                                text = "Precio por confirmar",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
