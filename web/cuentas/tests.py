@@ -161,6 +161,29 @@ class RegistroTests(TestCase):
         respuesta = self.client.get(reverse('cuentas:registro'))
         self.assertEqual(respuesta.status_code, 200)
 
+    def test_registro_acepta_contrasena_de_ocho_caracteres_aunque_sea_comun(self):
+        respuesta = self.client.post(reverse('cuentas:registro'), {
+            'username': 'ocho_caracteres',
+            'email': 'ocho@atelier.local',
+            'password1': 'password',
+            'password2': 'password',
+        })
+
+        self.assertRedirects(respuesta, reverse('cuentas:panel'))
+        self.assertTrue(Usuario.objects.filter(username='ocho_caracteres').exists())
+
+    def test_registro_rechaza_contrasena_menor_a_ocho_caracteres(self):
+        respuesta = self.client.post(reverse('cuentas:registro'), {
+            'username': 'corta',
+            'email': 'corta@atelier.local',
+            'password1': 'abc1234',
+            'password2': 'abc1234',
+        })
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, 'al menos 8 caracteres')
+        self.assertFalse(Usuario.objects.filter(username='corta').exists())
+
     def test_registro_crea_usuario_perfil_e_inicia_sesion(self):
         respuesta = self.client.post(reverse('cuentas:registro'), {
             'username': 'nueva',

@@ -7,9 +7,10 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -38,9 +39,11 @@ public class ClienteIaHttp implements ClienteIa {
     private static final Logger log = LoggerFactory.getLogger(ClienteIaHttp.class);
 
     private static final String ROL_SISTEMA =
-            "Eres el asistente de diseño textil de Atelier, una aplicación para rubro textil. "
-                    + "Respondes siempre en español, con lenguaje claro para diseñadores. "
-                    + "No inventes datos de inventario: si te dan cifras, usa exactamente esas.";
+            "Eres el asistente de estilo y diseño textil de Atelier. Respondes siempre en español "
+                    + "y con lenguaje claro. Puedes orientar sobre outfits, combinaciones, telas, "
+                    + "calidad y cuidado de prendas. Si falta contexto, pregunta antes de asumir. "
+                    + "No inventes datos de inventario, precios ni disponibilidad; si no recibes "
+                    + "datos verificados, indícalo.";
 
     private final IaProperties propiedades;
     private final RestClient rest;
@@ -62,6 +65,10 @@ public class ClienteIaHttp implements ClienteIa {
         RestClient.Builder configurado = builder
                 .baseUrl(propiedades.url())
                 .defaultHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE);
+        if (propiedades.apiKey() != null && !propiedades.apiKey().isBlank()) {
+            configurado.defaultHeader(
+                    HttpHeaders.AUTHORIZATION, "Bearer " + propiedades.apiKey());
+        }
 
         if (propiedades.timeoutSegundos() > 0) {
             Duration espera = Duration.ofSeconds(propiedades.timeoutSegundos());
@@ -101,7 +108,7 @@ public class ClienteIaHttp implements ClienteIa {
                 texto(prenda.getTela()),
                 texto(prenda.getDescripcion()));
 
-        String respuesta = chat(instruccion);
+        String respuesta = chat(List.of(new MensajeChat("user", instruccion)));
         if (respuesta == null || respuesta.isBlank()) {
             // Mejor una instrucción básica que ninguna.
             return instruccionBase(prenda);
@@ -137,8 +144,21 @@ public class ClienteIaHttp implements ClienteIa {
                 %s
                 """.formatted(datos);
 
-        String respuesta = chat(instruccion);
+        String respuesta = chat(List.of(new MensajeChat("user", instruccion)));
         return respuesta == null || respuesta.isBlank() ? null : respuesta.trim();
+    }
+
+    @Override
+    public String conversar(List<MensajeChat> mensajes) {
+        if (!disponible()) {
+            throw new IaNoDisponibleException(
+                    "La IA no está configurada. Define IA_URL para habilitarla.");
+        }
+        String respuesta = solicitarChat(mensajes);
+        if (respuesta == null || respuesta.isBlank()) {
+            throw new IaNoDisponibleException("El proveedor de IA devolvió una respuesta vacía.");
+        }
+        return respuesta.trim();
     }
 
     @Override
@@ -206,16 +226,28 @@ public class ClienteIaHttp implements ClienteIa {
      * un adorno, no una dependencia. Un fallo al redactar un comentario no debe
      * tirar abajo un cálculo de stock que ya salió bien.
      */
-    private String chat(String instruccionUsuario) {
+    private String chat(List<MensajeChat> mensajes) {
         if (!disponible()) {
             return null;
         }
 
+        try {
+            return solicitarChat(mensajes);
+        } catch (IaNoDisponibleException e) {
+            log.warn("No se pudo consultar el servidor de IA en {}: {}", propiedades.url(), e.getMessage());
+            return null;
+        }
+    }
+
+    private String solicitarChat(List<MensajeChat> mensajes) {
+        List<Map<String, String>> mensajesProveedor = new ArrayList<>();
+        mensajesProveedor.add(Map.of("role", "system", "content", ROL_SISTEMA));
+        mensajes.forEach(mensaje -> mensajesProveedor.add(
+                Map.of("role", mensaje.role(), "content", mensaje.content())));
+
         Map<String, Object> cuerpo = Map.of(
                 "model", propiedades.modeloTexto(),
-                "messages", List.of(
-                        Map.of("role", "system", "content", ROL_SISTEMA),
-                        Map.of("role", "user", "content", instruccionUsuario)),
+                "messages", mensajesProveedor,
                 "temperature", 0.4);
 
         try {
@@ -231,18 +263,29 @@ public class ClienteIaHttp implements ClienteIa {
                     || opciones.isEmpty()
                     || !(opciones.get(0) instanceof Map<?, ?> opcion)
                     || !(opcion.get("message") instanceof Map<?, ?> mensaje)) {
-                return null;
+                throw new IaNoDisponibleException(
+                        "El proveedor de IA devolvió una respuesta con formato inesperado.");
             }
             Object contenido = mensaje.get("content");
-            return contenido instanceof String c ? c : null;
-
-        } catch (ResourceAccessException e) {
-            // El servidor de texto no está. Se avisa por log y se sigue sin IA.
-            log.warn("Servidor de IA no disponible en {}: {}", propiedades.url(), e.getMessage());
-            return null;
-        } catch (RuntimeException e) {
-            log.warn("El servidor de IA devolvió un error: {}", e.getMessage());
-            return null;
+            if (contenido instanceof String texto && !texto.isBlank()) {
+                return texto;
+            }
+            throw new IaNoDisponibleException("El proveedor de IA devolvió una respuesta vacía.");
+        } catch (HttpStatusCodeException e) {
+            int status = e.getStatusCode().value();
+            String mensaje = switch (status) {
+                case 401, 403 -> "El proveedor rechazó la API key (HTTP " + status
+                        + "). Revisa IA_API_KEY y los permisos de la clave.";
+                case 400 -> "El proveedor rechazó la solicitud (HTTP 400). Revisa IA_MODELO_TEXTO.";
+                case 404 -> "El modelo solicitado no está disponible (HTTP 404). "
+                        + "Revisa IA_MODELO_TEXTO y que siga habilitado en el proveedor.";
+                default -> "El proveedor de IA respondió con HTTP " + status + ".";
+            };
+            log.warn("El proveedor de IA respondió con HTTP {}", status);
+            throw new IaNoDisponibleException(mensaje, e);
+        } catch (RestClientException e) {
+            throw new IaNoDisponibleException(
+                    "El proveedor de IA no respondió correctamente.", e);
         }
     }
 

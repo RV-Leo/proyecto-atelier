@@ -1,7 +1,22 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
+
+val configuracionLocal = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.isFile }?.inputStream()?.use { load(it) }
+}
+
+fun configuracionApi(gradleKey: String, environmentKey: String, localKey: String, default: String): String =
+    providers.gradleProperty(gradleKey).orNull
+        ?: providers.environmentVariable(environmentKey).orNull
+        ?: configuracionLocal.getProperty(localKey)
+        ?: default
+
+fun comoLiteralBuildConfig(value: String): String =
+    "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
 android {
     namespace = "com.tecsup.atelier"
@@ -15,6 +30,33 @@ android {
         targetSdk = 37
         versionCode = 1
         versionName = "1.0"
+
+        buildConfigField(
+            "String",
+            "API_BASE_URL",
+            comoLiteralBuildConfig(
+                configuracionApi(
+                    "atelierApiBaseUrl",
+                    "ATELIER_API_BASE_URL",
+                    "atelier.api.baseUrl",
+                    "http://10.0.2.2:8080/"
+                )
+            )
+        )
+        buildConfigField(
+            "String",
+            "API_USER",
+            comoLiteralBuildConfig(
+                configuracionApi("atelierApiUser", "ATELIER_API_USER", "atelier.api.user", "")
+            )
+        )
+        buildConfigField(
+            "String",
+            "API_PASSWORD",
+            comoLiteralBuildConfig(
+                configuracionApi("atelierApiPassword", "ATELIER_API_PASSWORD", "atelier.api.password", "")
+            )
+        )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -32,6 +74,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

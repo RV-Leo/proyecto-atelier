@@ -31,7 +31,16 @@ class AsistenteIaViewModel(
     val uiState: StateFlow<EstadoIaUi> = _uiState.asStateFlow()
 
     fun enviarConsulta(promptTexto: String) {
-        if (promptTexto.isBlank()) return
+        if (promptTexto.isBlank() || _uiState.value.cargando) return
+
+        val historialDto = _uiState.value.mensajes
+            .takeLast(19)
+            .map {
+                MensajeIaDto(
+                    rol = if (it.esUsuario) "user" else "assistant",
+                    contenido = it.texto
+                )
+            }
 
         val mensajeUsuario = MensajeChat(
             remitente = "Usuario",
@@ -49,14 +58,6 @@ class AsistenteIaViewModel(
         }
 
         viewModelScope.launch {
-            // Mapear historial al formato DTO
-            val historialDto = _uiState.value.mensajes.map {
-                MensajeIaDto(
-                    rol = if (it.esUsuario) "user" else "assistant",
-                    contenido = it.texto
-                )
-            }
-
             val resultado = repositorioIa.consultarIa(promptTexto, historialDto)
 
             resultado.onSuccess { respuestaTexto ->
@@ -71,26 +72,11 @@ class AsistenteIaViewModel(
                         mensajes = estadoActual.mensajes + mensajeIa
                     )
                 }
-            }.onFailure { excepcion ->
-                // Si la API no está configurada aún o falla la conexión, mostramos respuesta simulada
-                val respuestaFallback = MensajeChat(
-                    remitente = "Atelier AI",
-                    texto = "Para tu consulta \"$promptTexto\", te sugiero combinar un Polo Pima Minimalist con Jeans Slim Fit. (Estructura API lista para ingresar tu servidor/API Key).",
-                    esUsuario = false,
-                    outfitRecomendado = OutfitRecomendado(
-                        titulo = "Sugerencia de Estilo Atelier",
-                        prendasSummary = "Polo Pima Premium Azul + Jean Slim Fit Denim",
-                        precioTotal = 199.80,
-                        matchScore = "98% Match",
-                        colorHex = 0xFF2C3E50
-                    )
-                )
-
+            }.onFailure {
                 _uiState.update { estadoActual ->
                     estadoActual.copy(
                         cargando = false,
-                        errorMensaje = "Conexión pendiente: Configura tu URL Base y API Key en ClienteApiIa.kt",
-                        mensajes = estadoActual.mensajes + respuestaFallback
+                        errorMensaje = "No fue posible conectar con la IA. Revisa tu conexión y que el servidor esté disponible; puedes intentarlo de nuevo."
                     )
                 }
             }

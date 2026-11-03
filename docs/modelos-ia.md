@@ -1,17 +1,25 @@
 # Modelos de IA de Atelier
 
-En Atelier usamos IA para ayudar a diseñar prendas, revisar tendencias y ver si una idea se puede producir con los materiales disponibles. Para estas tareas elegimos modelos de la familia Qwen.
+En Atelier usamos IA para ayudar a diseñar prendas, revisar tendencias y ver si una idea se puede producir con los materiales disponibles. Temporalmente conectamos Gemini para las respuestas de texto; el objetivo posterior es usar modelos de la familia Qwen a través del mismo puente del backend.
 
 ## ¿Qué tuvimos en cuenta?
 
-Buscamos modelos que:
+Para la solución definitiva buscamos modelos que:
 - Se puedan usar sin pagar por cada consulta ni contratar una suscripción.
 - Tengan una licencia abierta que permita usarlos también en proyectos comerciales.
 - Entiendan bien el español, porque ese es el idioma de nuestros usuarios.
 
-## ¿Por qué elegimos Qwen?
+## Uso temporal de Gemini
 
-Preferimos usar una sola familia de modelos para que la integración sea más sencilla. Así trabajamos con herramientas compatibles entre sí y tenemos menos componentes que mantener. Además, el modelo que entiende las descripciones puede ayudar a mejorar las instrucciones para generar imágenes y luego analizar los resultados.
+Gemini se usa temporalmente para probar el asistente de texto sin esperar a desplegar Qwen. Las solicitudes pasan por Spring Boot y el proveedor se configura en el servidor; la web y Android nunca reciben la clave de Gemini. Al utilizar este servicio, los mensajes se envían a Google.
+
+La integración de chat usa el endpoint compatible con OpenAI de Gemini. Para cambiar el proveedor, se actualizan `IA_URL`, `IA_API_KEY` y `IA_MODELO_TEXTO` en el entorno del backend. Los clientes mantienen el endpoint Atelier `POST /api/v1/ia/chat`.
+
+Esta conexión no genera imágenes. En la web, las imágenes visibles con el proveedor conectado son texturas ilustrativas y la viabilidad debe verificarse con el inventario.
+
+## ¿Por qué planeamos usar Qwen?
+
+Para la solución definitiva preferimos usar una sola familia de modelos para que la integración sea más sencilla. Así trabajamos con herramientas compatibles entre sí y tenemos menos componentes que mantener. Además, el modelo que entiende las descripciones puede ayudar a mejorar las instrucciones para generar imágenes y luego analizar los resultados.
 
 Si el servidor no tiene suficiente capacidad para generar imágenes con Qwen-Image, podemos evaluar FLUX.1 [schnell] como alternativa.
 
@@ -44,7 +52,7 @@ Qwen3.6 trabaja con texto e imágenes, pero no genera imágenes. Por eso elegimo
 | FLUX.1 [dev] | Su licencia no permite el uso comercial |
 | Stable Diffusion 3.5 | Su licencia comunitaria tiene condiciones adicionales |
 | Llama / Gemma | Tienen licencias propias con restricciones de uso |
-| APIs de pago (GPT, Gemini, Midjourney, etc.) | No cumplen con nuestro criterio de uso local y sin costo; además, enviarían datos a servicios externos |
+| APIs de pago (GPT, Midjourney, etc.) | No cumplen con nuestro criterio de uso local y sin costo; además, enviarían datos a servicios externos. Gemini queda como excepción temporal para validar el puente |
 
 ## Así se usaría la IA en Atelier
 

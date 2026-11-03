@@ -1,6 +1,7 @@
 """Vistas del asistente de diseño con IA."""
 
 from django.contrib import messages
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -33,12 +34,23 @@ def asistente(request):
             datos = dict(form.cleaned_data)
             resumen = datos.pop('descripcion')
             proveedor = obtener_proveedor()
+            if proveedor.nombre == 'backend' and not request.user.is_authenticated:
+                messages.error(request, 'Inicia sesión para consultar el modelo de IA.')
+                return render(request, 'disenador/asistente.html', {
+                    'form': form,
+                    'conversacion': conversacion,
+                    'propuestas': propuestas,
+                    'modo_demo': settings.AI_PROVEEDOR == 'demo',
+                })
             try:
                 resultado = proveedor.generar(resumen, datos)
-            except NotImplementedError as error:
+            except RuntimeError as error:
                 messages.error(request, str(error))
                 return render(request, 'disenador/asistente.html', {
-                    'form': form, 'conversacion': None, 'propuestas': [],
+                    'form': form,
+                    'conversacion': None,
+                    'propuestas': [],
+                    'modo_demo': settings.AI_PROVEEDOR == 'demo',
                 })
 
             propuestas_generadas = resultado['propuestas']
@@ -94,8 +106,75 @@ def asistente(request):
         'form': form,
         'conversacion': conversacion,
         'propuestas': propuestas,
+        'modo_demo': settings.AI_PROVEEDOR == 'demo',
     }
     return render(request, 'disenador/asistente.html', contexto)
+
+
+@login_required
+@require_POST
+def conversar(request):
+    """Envía una pregunta al modelo y guarda el intercambio en la cuenta."""
+    texto = request.POST.get('mensaje', '').strip()
+    if not texto:
+        messages.error(request, 'Escribe una pregunta antes de enviarla.')
+        return redirect('disenador:asistente')
+    if len(texto) > 4000:
+        messages.error(request, 'La pregunta no puede superar los 4000 caracteres.')
+        return redirect('disenador:asistente')
+
+    proveedor = obtener_proveedor()
+    if proveedor.nombre != 'backend':
+        messages.error(request, 'El chat requiere configurar el proveedor "backend".')
+        return redirect('disenador:asistente')
+
+    conversacion_id = request.POST.get('conversacion_id', '').strip()
+    if conversacion_id:
+        conversacion = get_object_or_404(
+            Conversacion,
+            pk=conversacion_id,
+            usuario=request.user,
+        )
+    else:
+        conversacion = Conversacion.objects.create(
+            usuario=request.user,
+            titulo=texto[:60] + ('…' if len(texto) > 60 else ''),
+        )
+
+    historial = list(
+        conversacion.mensajes.order_by('-creada', '-pk')[:19]
+    )[::-1]
+    mensajes_chat = [
+        {
+            'role': 'user' if mensaje.rol == Mensaje.Rol.USUARIO else 'assistant',
+            'content': mensaje.texto,
+        }
+        for mensaje in historial
+    ]
+    mensajes_chat.append({'role': 'user', 'content': texto})
+
+    try:
+        respuesta = proveedor.conversar(mensajes_chat)
+    except RuntimeError as error:
+        messages.error(request, str(error))
+        return redirect(f'{reverse("disenador:asistente")}?c={conversacion.pk}')
+
+    Mensaje.objects.bulk_create([
+        Mensaje(
+            conversacion=conversacion,
+            rol=Mensaje.Rol.USUARIO,
+            texto=texto,
+        ),
+        Mensaje(
+            conversacion=conversacion,
+            rol=Mensaje.Rol.ASISTENTE,
+            texto=respuesta,
+        ),
+    ])
+    if not conversacion.titulo:
+        conversacion.titulo = texto[:60] + ('…' if len(texto) > 60 else '')
+        conversacion.save(update_fields=['titulo', 'actualizada'])
+    return redirect(f'{reverse("disenador:asistente")}?c={conversacion.pk}')
 
 
 @login_required

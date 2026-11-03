@@ -30,8 +30,12 @@
       <div class="nota-demo" style="margin-bottom:1.6rem">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
         <div>
-          <strong>Asistente en modo demostración.</strong> Las propuestas que ves son simuladas y combinan tu descripción con el
-          inventario real del proyecto. La arquitectura está lista para conectar el modelo Qwen-Image cuando esté disponible.
+          {% if modo_demo %}
+            <strong>Asistente en modo demostración.</strong> Las propuestas son simuladas y usan el inventario de demostración.
+          {% else %}
+            <strong>Asistente con puente IA.</strong> El texto se solicita al backend; las imágenes son texturas ilustrativas
+            y la viabilidad debe consultarse en el inventario.
+          {% endif %}
         </div>
       </div>
 
@@ -93,13 +97,18 @@
               {% endif %}
             </p>
           </form>
+        </div>
 
-          <div class="tablero-conversacion carta-texto" style="max-height:none">
+        <div class="chat-panel">
+          <div class="tablero-conversacion carta-texto">
             <div class="conversacion-head">
-              <h3>Conversación</h3>
+              <div>
+                <h3>Asesoría de estilo con IA</h3>
+                <p class="chat-subtitulo">Outfits, telas, calidad y combinaciones</p>
+              </div>
               {% if conversacion %}<span style="font-size:.8rem;color:var(--gris-texto)">{{ conversacion.creada|date:'d/m/Y H:i' }}</span>{% endif %}
             </div>
-            <div class="conversacion-mensajes" style="max-height:340px;overflow-y:auto">
+            <div class="conversacion-mensajes">
               {% if conversacion %}
                 {% for mensaje in conversacion.mensajes.all %}
                   <div class="mensaje mensaje-{% if mensaje.rol == 'usuario' %}usuario{% else %}asistente{% endif %}">
@@ -108,9 +117,25 @@
                   </div>
                 {% endfor %}
               {% else %}
-                <p class="conversacion-vacia">Aún no has hecho ninguna consulta. Describe una idea para empezar.</p>
+                <p class="conversacion-vacia">Pregunta sobre outfits, telas, calidad o cómo combinar tus prendas.</p>
               {% endif %}
             </div>
+            {% if user.is_authenticated and not modo_demo %}
+              <form class="formulario-chat" method="post" action="{% url 'disenador:conversar' %}">
+                {% csrf_token %}
+                {% if conversacion %}<input type="hidden" name="conversacion_id" value="{{ conversacion.pk }}">{% endif %}
+                <textarea id="mensaje-asesoria" name="mensaje" aria-label="Mensaje"
+                          maxlength="4000" rows="1"
+                          placeholder="Escribe un mensaje..." required></textarea>
+                <button class="boton-enviar-chat" type="submit" aria-label="Enviar mensaje" title="Enviar mensaje">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M12 19V5m-7 7 7-7 7 7" />
+                  </svg>
+                </button>
+              </form>
+            {% elif not user.is_authenticated %}
+              <p class="ayuda" style="padding:0 1rem 1rem">Inicia sesión para conversar con la IA.</p>
+            {% endif %}
           </div>
         </div>
 

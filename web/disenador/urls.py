@@ -8,6 +8,7 @@ app_name = 'disenador'
 
 urlpatterns = [
     path('', views.asistente, name='asistente'),
+    path('conversar/', views.conversar, name='conversar'),
     path('historial/', views.historial, name='historial'),
     path('propuesta/<int:pk>/favorita/', views.alternar_favorita, name='alternar_favorita'),
 ]

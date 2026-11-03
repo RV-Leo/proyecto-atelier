@@ -1,12 +1,11 @@
-"""Servicio de generación de propuestas de diseño.
+"""Proveedores de propuestas de diseño y conexión al puente de IA de Atelier."""
 
-Arquitectura preparada para conectar un modelo real (familia Qwen, p. ej.
-Qwen-Image) en el futuro. Por defecto se usa el proveedor de demostración,
-que genera propuestas simuladas usando el inventario real del proyecto.
-Las propuestas de demostración se identifican claramente en la interfaz.
-"""
-
+import base64
+import hashlib
+import json
 import random
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 from django.conf import settings
 
@@ -102,28 +101,110 @@ class ProveedorDemo(ProveedorDiseno):
         }
 
 
-class ProveedorQwen(ProveedorDiseno):
-    """Integración futura con modelos Qwen (Qwen-Image / Qwen-Image-Edit).
+class ProveedorGateway(ProveedorDiseno):
+    """Solicita texto al backend, que mantiene las credenciales del proveedor."""
 
-    Aún no está conectada: al seleccionarla devuelve un error claro para no
-    presentar resultados simulados como si fueran reales.
-    """
+    nombre = 'backend'
 
-    nombre = 'qwen'
-
-    def __init__(self, url_base):
-        self.url_base = url_base
+    def conversar(self, mensajes):
+        return self._consultar_backend(mensajes)
 
     def generar(self, resumen, opciones):
-        raise NotImplementedError(
-            'El proveedor Qwen-Image aún no está conectado. '
-            'Usa el proveedor "demo" mientras se implementa la integración.'
+        tipo = opciones.get('tipo_prenda', 'prenda')
+        estilo = opciones.get('estilo', 'minimalista')
+        temporada = opciones.get('temporada', 'sin especificar')
+        calidad = opciones.get('calidad', 'sin especificar')
+        paleta = opciones.get('paleta', 'neutros')
+        instruccion = (
+            'Propón un diseño textil en español, en un párrafo conciso. '
+            'Describe la silueta, los detalles y cómo aplicar la paleta. '
+            'No afirmes que hay materiales disponibles ni que la prenda es viable; '
+            'el inventario se verifica por separado.\n\n'
+            f'Descripción: {resumen}\n'
+            f'Tipo: {tipo}\nEstilo: {estilo}\nTemporada: {temporada}\n'
+            f'Nivel de calidad: {calidad}\nPaleta: {paleta}'
         )
+        texto = self._consultar_backend([{'role': 'user', 'content': instruccion}])
+
+        id_textura = hashlib.sha256(instruccion.encode('utf-8')).hexdigest()[:12]
+        nombre = f'propuesta_{tipo}_{estilo}_{id_textura}'
+        textura = generar_textura_tela(
+            f'disenador/{nombre}',
+            color_inicio='#8AA1B4',
+            color_fin='#37474F',
+            semilla=sum(map(ord, instruccion)) % 9999 or 1,
+        )
+        return {
+            'propuestas': [{
+                'titulo': f'{tipo.title()} {estilo.title()} · propuesta IA',
+                'resumen': texto,
+                'paleta': paleta,
+                'materiales': 'Por verificar en el inventario',
+                'viabilidad': 'Pendiente de consulta al inventario',
+                'nota': 'La imagen es una textura ilustrativa, no fue generada por IA.',
+                'imagen': textura,
+            }],
+            'intro': (
+                'El modelo conectado al backend generó la descripción. '
+                'La imagen es ilustrativa y la viabilidad debe verificarse por separado.'
+            ),
+            'demostracion': True,
+        }
+
+    def _consultar_backend(self, mensajes):
+        url_base = getattr(settings, 'AI_BACKEND_URL', '').rstrip('/')
+        if not url_base:
+            raise RuntimeError('Configura ATELIER_BACKEND_URL para conectar el puente de IA.')
+
+        cuerpo = json.dumps({'messages': mensajes}).encode('utf-8')
+        solicitud = Request(
+            f'{url_base}/api/v1/ia/chat',
+            data=cuerpo,
+            headers=self._cabeceras(),
+            method='POST',
+        )
+        try:
+            with urlopen(solicitud, timeout=settings.AI_BACKEND_TIMEOUT) as respuesta_http:
+                respuesta = json.loads(respuesta_http.read().decode('utf-8'))
+        except HTTPError as error:
+            try:
+                cuerpo_error = json.loads(error.read().decode('utf-8'))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                cuerpo_error = None
+            mensaje = (
+                cuerpo_error.get('mensaje')
+                if isinstance(cuerpo_error, dict)
+                else None
+            )
+            if isinstance(mensaje, str) and mensaje.strip():
+                raise RuntimeError(mensaje.strip()) from error
+            raise RuntimeError(
+                f'El puente de IA respondió con estado HTTP {error.code}.'
+            ) from error
+        except (URLError, TimeoutError) as error:
+            raise RuntimeError('No se pudo conectar con el puente de IA de Atelier.') from error
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise RuntimeError('El puente de IA devolvió una respuesta inválida.') from error
+
+        texto = respuesta.get('respuesta') if isinstance(respuesta, dict) else None
+        if not isinstance(texto, str) or not texto.strip():
+            raise RuntimeError('El puente de IA no devolvió una respuesta de texto.')
+        return texto.strip()
+
+    @staticmethod
+    def _cabeceras():
+        cabeceras = {'Content-Type': 'application/json'}
+        usuario = getattr(settings, 'AI_BACKEND_USER', '')
+        clave = getattr(settings, 'AI_BACKEND_PASSWORD', '')
+        if usuario and clave:
+            credenciales = base64.b64encode(f'{usuario}:{clave}'.encode('utf-8')).decode('ascii')
+            cabeceras['Authorization'] = f'Basic {credenciales}'
+        return cabeceras
 
 
 def obtener_proveedor():
     """Devuelve el proveedor configurado en settings.AI_PROVEEDOR."""
     nombre = getattr(settings, 'AI_PROVEEDOR', 'demo')
-    if nombre == 'qwen':
-        return ProveedorQwen(getattr(settings, 'AI_URL_BASE', ''))
+    if nombre in {'backend', 'qwen'}:
+        return ProveedorGateway()
     return ProveedorDemo()

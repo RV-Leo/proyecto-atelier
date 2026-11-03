@@ -1,18 +1,8 @@
 # proyecto-atelier — Backend
 
-## Rama actual: `feature/backend-api-inventario`
-
-El historial local tiene 5 commits:
-
-1. **`51bf3f0`** — backend: API REST inicial con Spring Boot, seguridad y PostgreSQL
-2. **`8c064a9`** — backend: esquema de base de datos con Flyway (7 tablas, 3 módulos)
-3. **`1f26a8a`** — backend: API REST de inventario, prendas, viabilidad y tendencias
-4. **`5051a51`** — backend: puente de IA para diseño y narración de viabilidad
-5. **`014a7a0`** — backend: paginación, filtros y slug para que la web consuma la API
-
 ---
 
-## 1. ¿Qué hay este commit?
+## 1. Módulos y puente de IA
 
 ### API REST + Puente de IA
 
@@ -29,6 +19,7 @@ El backend cumple los dos roles que pide el README:
 | `prendas` | GET/POST + `/materiales` | Slug nuevo (`/prendas/slug/{slug}`) |
 | `viabilidad/{prendaId}` | POST | Stock real vs. ficha técnica. `viable: false` es 200, no error |
 | `tendencias` | GET/POST + `/region/{region}` | Paginación opcional |
+| `ia/chat` | POST | Chat de texto compartido por la web y la app móvil |
 | `diseno/prompt` | GET | `fuente: MODELO` o `PLANTILLA` |
 | `diseno/propuestas` | POST|GET | 503 si la IA no está |
 | `diseno/propuestas/{id}/seleccion` | PUT | Marca la elegida |
@@ -39,6 +30,9 @@ El backend cumple los dos roles que pide el README:
 - `ConfigIa` selecciona el cliente según `propiedades.habilitada()`, no `@ConditionalOnProperty`.
 - Si `atelier.ia.url` está vacío (por defecto): IA fuera, API funciona igual con plantilla.
 - Si la URL tiene valor: se llama al modelo, se guarda el comentario y las imágenes.
+- `POST /api/v1/ia/chat` acepta hasta 20 mensajes de usuario/asistente; no acepta instrucciones de sistema enviadas por clientes.
+- Para usar Gemini temporalmente, configura la URL compatible con OpenAI `https://generativelanguage.googleapis.com/v1beta/openai/`, `IA_API_KEY` y `IA_MODELO_TEXTO=gemini-3.8-flash`. La clave solo vive en el backend.
+- Para cambiar a Qwen, apunta `IA_URL` al servidor compatible y cambia `IA_MODELO_TEXTO`; los contratos de web y móvil no cambian.
 - `GuardadorImagenes` escribe PNG en disco bajo `atelier.ia.directorio-imagenes`, servible en `/imagenes/**` **sin autenticación** (crucial: un `<img>` no puede mandar Basic Auth).
 - `IaNoDisponibleException` → HTTP 503.
 
@@ -51,7 +45,7 @@ El backend cumple los dos roles que pide el README:
 | `POSTGRES_PASSWORD` | (vacío) | Contraseña. |
 | `IA_URL` | *(vacío)* | URL base del servidor compatible con OpenAI. Vacío = IA fuera. |
 | `IA_API_KEY` | (vacío) | Bearer opcional. |
-| `IA_MODELO_TEXTO` | `Qwen3.6-35B-A3B` | Modelo para chat (prompt, comentario viabilidad). |
+| `IA_MODELO_TEXTO` | `gemini-3.8-flash` | Modelo para chat (prompt, comentario viabilidad). |
 | `IA_MODELO_IMAGEN` | `Qwen-Image` | Modelo para imágenes. |
 | `IA_TIMEOUT_SEGUNDOS` | `120` | Límite de espera. `<= 0` = sin límite. |
 | `IA_DIRECTORIO_IMAGENES` | `imagenes-diseno` | Donde se guardan los PNG. |
@@ -66,6 +60,7 @@ El backend cumple los dos roles que pide el README:
 #### Autenticación
 
 - HTTP Basic en **todos** los endpoints, **menos** `/actuator/health` e `/actuator/info`.
+- Las credenciales compartidas en una app móvil son solo para desarrollo; antes de distribuir se necesita autenticación de usuario con tokens.
 - `/imagenes/**` es **publico** (no hay Basic Auth), porque un `<img>` no puede mandar cabeceras.
 - Usuario por defecto: `atelier`, password: `atelier-dev` (en `application-local.properties`, `.gitignore`).
 
@@ -74,12 +69,11 @@ El backend cumple los dos roles que pide el README:
 - CSRF deshabilitado, sin sesiones (clientes puros de API).
 - Errores: `400` (validación), `401` (sin auth), `404` (no existe), `409` (unicidad URL tendencia), `503` (servidor IA caído).
 
-#### Tests: 37 en verde
+#### Pruebas
 
-- `ApiFlujoTests` — 9 integración contra PostgreSQL real.
-- `PuenteIaTests` — 7 pruebas del estado sin IA (mock + infra).
-- `ClienteIaHttpTests` — 11 pruebas unitarias del cliente HTTP con `MockRestServiceServer`.
-- `ApiCatalogoTests` — 9 pruebas nuevas de paginación, filtros y slug.
+- `ApiFlujoTests`, `PuenteIaTests` y `ApiCatalogoTests` — integración; requieren PostgreSQL disponible.
+- `ClienteIaHttpTests` — cliente HTTP probado con `MockRestServiceServer`.
+- `ChatIaRequestTests` — validación del contrato común de chat.
 
 ---
 

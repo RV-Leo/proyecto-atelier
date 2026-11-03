@@ -7,9 +7,11 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withUnauthorizedRequest;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
@@ -111,6 +113,30 @@ class ClienteIaHttpTests {
         assertEquals("Se puede producir: hay stock suficiente.", cliente.explicarViabilidad(contexto()));
     }
 
+    @Test
+    void conversarEnviaHistorialYClaveAlProveedor() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer servidor = MockRestServiceServer.bindTo(builder).build();
+        IaProperties propiedades = new IaProperties(
+                BASE, "clave-de-prueba", "gemini-2.5-flash", "qwen-imagen",
+                0, carpetaTemporal.toString());
+        ClienteIaHttp cliente = new ClienteIaHttp(
+                propiedades, new GuardadorImagenes(propiedades), builder);
+
+        servidor.expect(requestTo(BASE + "/chat/completions"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header("Authorization", "Bearer clave-de-prueba"))
+                .andExpect(content().string(containsString("\"role\":\"assistant\"")))
+                .andRespond(withSuccess("""
+                        {"choices":[{"message":{"content":"Prueba exitosa"}}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        assertEquals("Prueba exitosa", cliente.conversar(List.of(
+                new ClienteIa.MensajeChat("assistant", "Hola"),
+                new ClienteIa.MensajeChat("user", "Ayúdame con un vestido"))));
+        servidor.verify();
+    }
+
     /**
      * Un fallo al redactar el comentario no debe tirar abajo un cálculo de
      * stock que ya salió bien: se devuelve null y el servicio usa su plantilla.
@@ -125,6 +151,44 @@ class ClienteIaHttpTests {
                 .andRespond(withServerError());
 
         assertNull(cliente.explicarViabilidad(contexto()));
+    }
+
+    @Test
+    void chatInformaCuandoElProveedorRechazaLaClave() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer servidor = MockRestServiceServer.bindTo(builder).build();
+        ClienteIaHttp cliente = cliente(servidor, builder);
+
+        servidor.expect(requestTo(BASE + "/chat/completions"))
+                .andRespond(withUnauthorizedRequest());
+
+        IaNoDisponibleException error = assertThrows(
+                IaNoDisponibleException.class,
+                () -> cliente.conversar(List.of(
+                        new ClienteIa.MensajeChat("user", "Prueba"))));
+
+        assertTrue(error.getMessage().contains("rechazó la API key"));
+        assertTrue(error.getMessage().contains("401"));
+        servidor.verify();
+    }
+
+    @Test
+    void chatInformaCuandoElModeloNoEstaDisponible() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer servidor = MockRestServiceServer.bindTo(builder).build();
+        ClienteIaHttp cliente = cliente(servidor, builder);
+
+        servidor.expect(requestTo(BASE + "/chat/completions"))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        IaNoDisponibleException error = assertThrows(
+                IaNoDisponibleException.class,
+                () -> cliente.conversar(List.of(
+                        new ClienteIa.MensajeChat("user", "Prueba"))));
+
+        assertTrue(error.getMessage().contains("modelo solicitado no está disponible"));
+        assertTrue(error.getMessage().contains("IA_MODELO_TEXTO"));
+        servidor.verify();
     }
 
     @Test

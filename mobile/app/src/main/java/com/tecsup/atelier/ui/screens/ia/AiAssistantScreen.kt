@@ -17,8 +17,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -31,6 +34,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,6 +46,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -71,6 +76,20 @@ fun AiAssistantScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var textoEntrada by remember { mutableStateOf("") }
+    val listState = rememberLazyListState()
+
+    fun enviar() {
+        if (textoEntrada.isNotBlank()) {
+            viewModel.enviarConsulta(textoEntrada)
+            textoEntrada = ""
+        }
+    }
+
+    LaunchedEffect(uiState.mensajes.size) {
+        if (uiState.mensajes.isNotEmpty()) {
+            listState.animateScrollToItem(uiState.mensajes.size - 1)
+        }
+    }
 
     val sugerenciasConsulta = listOf(
         "Armar outfit casual de fin de semana",
@@ -114,7 +133,7 @@ fun AiAssistantScreen(
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    text = "Conectado mediante API (Retrofit / OkHttp)",
+                    text = "Con conexión vía API de Atelier",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -165,9 +184,10 @@ fun AiAssistantScreen(
 
         // Lista de Mensajes del Chat
         LazyColumn(
+            state = listState,
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(bottom = 80.dp)
+            contentPadding = PaddingValues(bottom = 16.dp)
         ) {
             items(uiState.mensajes) { mensaje ->
                 BurbujaMensajeChat(mensaje = mensaje)
@@ -198,19 +218,32 @@ fun AiAssistantScreen(
             }
         }
 
+        uiState.errorMensaje?.let { mensaje ->
+            Text(
+                text = mensaje,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp)
+            )
+        }
+
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Campo de entrada de texto
+        // Campo de entrada de texto con botón de envío
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             OutlinedTextField(
                 value = textoEntrada,
-                onValueChange = { textoEntrada = it },
+                onValueChange = { textoEntrada = it.take(4000) },
                 placeholder = { Text("Escribe tu consulta a la IA...") },
                 singleLine = true,
                 shape = RoundedCornerShape(24.dp),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = { enviar() }),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = MaterialTheme.colorScheme.surface,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surface
@@ -222,21 +255,18 @@ fun AiAssistantScreen(
 
             Surface(
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary,
+                color = if (textoEntrada.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
                 modifier = Modifier
                     .size(50.dp)
-                    .clickable {
-                        if (textoEntrada.isNotBlank()) {
-                            viewModel.enviarConsulta(textoEntrada)
-                            textoEntrada = ""
-                        }
+                    .clickable(enabled = textoEntrada.isNotBlank()) {
+                        enviar()
                     }
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        painter = painterResource(R.drawable.ic_add),
-                        contentDescription = "Enviar",
-                        tint = MaterialTheme.colorScheme.onPrimary,
+                        painter = painterResource(R.drawable.ic_send),
+                        contentDescription = "Enviar mensaje",
+                        tint = if (textoEntrada.isNotBlank()) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(22.dp)
                     )
                 }

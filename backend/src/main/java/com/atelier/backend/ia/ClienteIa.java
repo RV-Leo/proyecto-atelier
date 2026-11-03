@@ -45,6 +45,13 @@ public interface ClienteIa {
     String explicarViabilidad(ContextoViabilidad contexto);
 
     /**
+     * Conversa con el modelo usando el historial validado del cliente.
+     *
+     * @throws IaNoDisponibleException si el proveedor no está configurado o falla
+     */
+    String conversar(List<MensajeChat> mensajes);
+
+    /**
      * Genera imágenes de la prenda (paso 3 del flujo, Qwen-Image).
      *
      * @param prompt instrucción para el modelo de imágenes
@@ -60,6 +67,10 @@ public interface ClienteIa {
             int puntaje,
             List<ViabilidadResponse.Detalle> detalles,
             List<ViabilidadResponse.Alternativa> alternativas) {
+    }
+
+    /** Mensaje de texto que se intercambia con el modelo. */
+    record MensajeChat(String role, String content) {
     }
 
     /**
