@@ -28,3 +28,5 @@ Pexels permite el uso gratuito de fotos para fines comerciales sin atribución; 
 | `cinturon-de-cuero-marron` | 35392687 | BELTLEY COM | [Pexels](https://www.pexels.com/photo/high-quality-leather-belt-with-brass-buckle-35392687/) |
 | `panuelo-de-seda-estampado` | 31193085 | Luisa Andalécio | [Pexels](https://www.pexels.com/photo/close-up-of-woman-adjusting-colorful-scarf-31193085/) |
 | `set-de-botones-de-nacar` | 5119776 | Alejandro Nuñez | [Pexels](https://www.pexels.com/photo/close-up-shot-of-buttons-5119776/) |
+
+Las portadas de las cuatro colecciones recomendadas reutilizan fotos de este catálogo y añaden una ficha de paleta con colores en formato hexadecimal. Los archivos finales están en `web/media/colecciones/` y mantienen proporción 16:10.

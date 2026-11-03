@@ -272,9 +272,13 @@ class Command(BaseCommand):
                 creados,
             )
             if creado:
-                objeto.imagen = placeholder.generar_textura_ancha(
-                    f'colecciones/{objeto.slug}', color_inicio=tono
-                )
+                portada = Path(settings.MEDIA_ROOT) / 'colecciones' / f'{objeto.slug}.jpg'
+                if portada.is_file():
+                    objeto.imagen = f'colecciones/{objeto.slug}.jpg'
+                else:
+                    objeto.imagen = placeholder.generar_textura_ancha(
+                        f'colecciones/{objeto.slug}', color_inicio=tono
+                    )
                 objeto.save(update_fields=['imagen'])
             for nombre_producto in productos:
                 producto = Producto.objects.filter(nombre=nombre_producto).first()

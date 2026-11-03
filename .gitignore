@@ -74,3 +74,9 @@ web/media/productos/*
 !web/media/productos/cinturon-de-cuero-marron.jpg
 !web/media/productos/panuelo-de-seda-estampado.jpg
 !web/media/productos/set-de-botones-de-nacar.jpg
+!web/media/colecciones/
+web/media/colecciones/*
+!web/media/colecciones/atemporal-con-caracter.jpg
+!web/media/colecciones/verano-en-lino.jpg
+!web/media/colecciones/noche-de-bordeaux.jpg
+!web/media/colecciones/uniforme-urbano.jpg
