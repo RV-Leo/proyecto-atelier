@@ -63,6 +63,13 @@ public class ClienteIaHttp implements ClienteIa {
                 .baseUrl(propiedades.url())
                 .defaultHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE);
 
+        // Proveedores en la nube (Google AI Studio) exigen la clave como Bearer.
+        // Los servidores locales (Ollama, vLLM) no la usan y la ignoran, por eso
+        // solo se añade la cabecera cuando hay clave configurada.
+        if (propiedades.apiKey() != null && !propiedades.apiKey().isBlank()) {
+            configurado.defaultHeader("Authorization", "Bearer " + propiedades.apiKey());
+        }
+
         if (propiedades.timeoutSegundos() > 0) {
             Duration espera = Duration.ofSeconds(propiedades.timeoutSegundos());
             SimpleClientHttpRequestFactory fabrica = new SimpleClientHttpRequestFactory();
@@ -149,6 +156,9 @@ public class ClienteIaHttp implements ClienteIa {
                 "model", propiedades.modeloImagen(),
                 "prompt", prompt,
                 "n", pedidas,
+                // Google devuelve la imagen codificada; GuardadorImagenes la persiste
+                // para poder servirla desde /imagenes/** sin autenticacion.
+                "response_format", "b64_json",
                 "size", "1024x1024");
 
         Map<?, ?> respuesta;

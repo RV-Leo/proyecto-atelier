@@ -237,7 +237,7 @@ class ClienteIaHttpTests {
 
     private ClienteIaHttp cliente(MockRestServiceServer servidor, RestClient.Builder builder) {
         IaProperties propiedades = new IaProperties(
-                BASE, "", "qwen-texto", "qwen-imagen", 0, carpetaTemporal.toString());
+                BASE, "", "qwen-texto", "qwen-imagen", 0, carpetaTemporal.toString(), "");
         return new ClienteIaHttp(propiedades, new GuardadorImagenes(propiedades), builder);
     }
 

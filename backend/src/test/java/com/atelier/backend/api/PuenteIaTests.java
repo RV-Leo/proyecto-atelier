@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,10 +30,16 @@ import org.springframework.transaction.annotation.Transactional;
  *       petición está mal";</li>
  *   <li>la viabilidad se sigue calculando igual, con el comentario de plantilla.</li>
  * </ul>
+ *
+ * <p>Este contrato es sobre el comportamiento <em>sin</em> IA, así que las
+ * propiedades del puente se vacían a mano: si no, la prueba dependería de lo
+ * que cada desarrollador tenga en su archivo local (gitignored) y en unas
+ * máquinas fallaría y en otras saldría a la red real a generar imágenes.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
+@TestPropertySource(properties = {"atelier.ia.url=", "atelier.ia.url-imagen="})
 class PuenteIaTests {
 
     @Autowired
