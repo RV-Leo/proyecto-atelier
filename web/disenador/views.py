@@ -2,6 +2,7 @@
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.files.base import ContentFile
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -42,6 +43,7 @@ def asistente(request):
                 })
 
             propuestas_generadas = resultado['propuestas']
+            es_demo = resultado.get('demostracion', True)
 
             if request.user.is_authenticated:
                 conversacion = Conversacion.objects.create(
@@ -60,7 +62,7 @@ def asistente(request):
                     texto=f'{resultado["intro"]}\n{lista}',
                 )
                 for p in propuestas_generadas:
-                    PropuestaDiseno.objects.create(
+                    propuesta = PropuestaDiseno.objects.create(
                         usuario=request.user,
                         conversacion=conversacion,
                         prompt=resumen,
@@ -69,26 +71,45 @@ def asistente(request):
                         temporada=datos['temporada'],
                         calidad=datos['calidad'],
                         paleta=datos['paleta'],
-                        resultado_resumen=p['resumen'],
-                        imagen=p['imagen'],
+                        resultado_resumen=p.get('resultado_resumen', p.get('resumen', '')),
                         es_favorita=False,
-                        es_demo=True,
+                        es_demo=es_demo,
                     )
+                    if es_demo:
+                        # Demo: imagen es una ruta de archivo local (Pillow).
+                        propuesta.imagen = p['imagen']
+                        propuesta.save()
+                    else:
+                        # Backend: imagen son bytes descargados del servidor.
+                        propuesta.imagen.save(
+                            p['imagen_nombre'],
+                            ContentFile(p['imagen_bytes']),
+                            save=True,
+                        )
                 messages.success(
                     request,
-                    'Tus propuestas de demostración se guardaron. '
+                    'Tus propuestas se generaron con la IA del backend. '
                     'Explóralas y marca tus favoritas.',
                 )
                 return redirect(f'{reverse("disenador:asistente")}?c={conversacion.pk}')
             else:
-                for propuesta in propuestas_generadas:
-                    propuesta['resultado_resumen'] = propuesta.get('resumen', '')
-                request.session['propuestas_demo'] = propuestas_generadas
-                messages.info(
+                # Usuario no autenticado: solo funciona con demo.
+                if es_demo:
+                    for propuesta in propuestas_generadas:
+                        propuesta['resultado_resumen'] = propuesta.get('resumen', '')
+                    request.session['propuestas_demo'] = propuestas_generadas
+                    messages.info(
+                        request,
+                        'Inicia sesión para guardar y reutilizar tus propuestas de diseño.',
+                    )
+                    return redirect('disenador:asistente')
+                messages.error(
                     request,
-                    'Inicia sesión para guardar y reutilizar tus propuestas de diseño.',
+                    'Inicia sesión para usar la generación de imágenes real.',
                 )
-                return redirect('disenador:asistente')
+                return render(request, 'disenador/asistente.html', {
+                    'form': form, 'conversacion': None, 'propuestas': [],
+                })
 
     contexto = {
         'form': form,

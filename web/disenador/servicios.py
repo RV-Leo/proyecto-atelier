@@ -8,7 +8,9 @@ Las propuestas de demostración se identifican claramente en la interfaz.
 
 import random
 
+import requests
 from django.conf import settings
+from django.core.files.base import ContentFile
 
 from catalogo.models import Material
 from core.placeholder import generar_textura_tela
@@ -121,9 +123,94 @@ class ProveedorQwen(ProveedorDiseno):
         )
 
 
+class ProveedorBackend(ProveedorDiseno):
+    """Proveedor real: crea la prenda en el backend y genera imágenes con la IA.
+
+    Flujo:
+      1. POST /api/v1/prendas      → crea la prenda y devuelve su id
+      2. POST /prendas/{id}/diseno/propuestas → genera imágenes (Pollinations)
+      3. Descarga cada imagen y la devuelve como bytes para guardarla en disco.
+
+    Nunca envía la clave de Google al proveedor de imágenes: el backend ya se
+    encarga de separar texto (Gemini) de imágenes (Pollinations).
+    """
+
+    nombre = 'backend'
+
+    def __init__(self, url_base=None, usuario=None, contrasena=None, timeout=None):
+        self.url_base = (url_base or getattr(settings, 'API_BASE_URL', 'http://localhost:8080/api/v1')).rstrip('/')
+        # Las imágenes se sirven bajo /imagenes/ (fuera del prefijo /api/v1).
+        self.host_base = self.url_base[: -len('/api/v1')] if self.url_base.endswith('/api/v1') else self.url_base
+        self.usuario = usuario or getattr(settings, 'API_USER', 'atelier')
+        self.contrasena = contrasena or getattr(settings, 'API_PASSWORD', 'atelier-dev')
+        self.timeout = int(timeout or getattr(settings, 'API_TIMEOUT', 30))
+
+    def _crear_prenda(self, resumen, opciones):
+        payload = {
+            "nombre": opciones.get("nombre", resumen[:120] or "Diseño sin nombre"),
+            "tipoPrenda": opciones.get("tipo_prenda", "prenda"),
+            "estilo": opciones.get("estilo", "minimalista"),
+            "colores": opciones.get("paleta", ""),
+            "tela": "",
+            "descripcion": resumen,
+        }
+        resp = requests.post(
+            f"{self.url_base}/prendas",
+            json=payload,
+            auth=(self.usuario, self.contrasena),
+            timeout=self.timeout,
+        )
+        resp.raise_for_status()
+        return resp.json()["id"]
+
+    def _generar_propuestas(self, prenda_id, cantidad):
+        resp = requests.post(
+            f"{self.url_base}/prendas/{prenda_id}/diseno/propuestas",
+            json={"cantidad": cantidad},
+            auth=(self.usuario, self.contrasena),
+            timeout=self.timeout,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def _descargar_imagen(self, imagen_url):
+        resp = requests.get(
+            f"{self.host_base}{imagen_url}",
+            auth=(self.usuario, self.contrasena),
+            timeout=self.timeout,
+        )
+        resp.raise_for_status()
+        return resp.content
+
+    def generar(self, resumen, opciones):
+        esfuerzo = int(opciones.get("esfuerzo", 3))
+        prenda_id = self._crear_prenda(resumen, opciones)
+        datos = self._generar_propuestas(prenda_id, esfuerzo)
+
+        propuestas = []
+        for i, item in enumerate(datos):
+            nombre_archivo = f"propuesta_{prenda_id}_{i + 1}.jpg"
+            imagen_bytes = self._descargar_imagen(item["imagenUrl"])
+            propuestas.append({
+                "titulo": f"Propuesta {i + 1} · {opciones.get('tipo_prenda', 'prenda').title()} {opciones.get('estilo', '').title()}",
+                "resumen": item.get("promptUsado", ""),
+                "imagen_bytes": imagen_bytes,
+                "imagen_nombre": nombre_archivo,
+                "imagen_url_backend": item["imagenUrl"],
+            })
+
+        return {
+            "propuestas": propuestas,
+            "intro": "Imágenes generadas por la IA del backend (Pollinations, gratuito).",
+            "demostracion": False,
+        }
+
+
 def obtener_proveedor():
     """Devuelve el proveedor configurado en settings.AI_PROVEEDOR."""
     nombre = getattr(settings, 'AI_PROVEEDOR', 'demo')
     if nombre == 'qwen':
         return ProveedorQwen(getattr(settings, 'AI_URL_BASE', ''))
+    if nombre == 'backend':
+        return ProveedorBackend()
     return ProveedorDemo()
