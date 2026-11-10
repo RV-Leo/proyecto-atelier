@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Nueva colección · ATELIER{% endblock %}
+
+{% block contenido %}
+  <section class="seccion">
+    <div class="contenedor">
+      <div class="panel-autenticar" style="max-width:640px">
+        <h1>Nueva colección</h1>
+        <p style="color:var(--gris-texto);text-align:center">Agrupa tus prendas y telas favoritas en una cápsula.</p>
+
+        {% if form.non_field_errors %}
+          <div class="errores-no-campo">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <form class="formulario" method="post" action="{% url 'cuentas:coleccion_nueva' %}" enctype="multipart/form-data" style="margin-top:1.4rem">
+          {% csrf_token %}
+
+          <div class="campo">
+            <label for="{{ form.nombre.id_for_label }}">{{ form.nombre.label }}</label>
+            {{ form.nombre }}
+            {% if form.nombre.errors %}<ul class="campo-errores">{{ form.nombre.errors }}</ul>{% endif %}
+          </div>
+
+          <div class="campo">
+            <label for="{{ form.descripcion.id_for_label }}">{{ form.descripcion.label }}</label>
+            {{ form.descripcion }}
+          </div>
+
+          <div class="campo">
+            <label for="{{ form.imagen.id_for_label }}">{{ form.imagen.label }}</label>
+            {{ form.imagen }}
+            <span class="ayuda">Opcional. Si no la añades, se usará una imagen de demostración.</span>
+          </div>
+
+          <button class="btn btn-primario" type="submit">Crear colección</button>
+        </form>
+
+        <p class="pie-form" style="margin-top:1.2rem">
+          <a class="enlace-resaltado" href="{% url 'cuentas:perfil' %}">← Volver a mi perfil</a>
+        </p>
+      </div>
+    </div>
+  </section>
+{% endblock %}

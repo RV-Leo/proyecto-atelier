@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Catálogo · ATELIER{% endblock %}
+
+{% block contenido %}
+  <section class="seccion">
+    <div class="contenedor">
+      <div class="seccion-cabecera">
+        <div>
+          <h1 class="seccion-titulo">Catálogo</h1>
+          <p class="seccion-subtitulo" style="margin-bottom:0">
+            {% if filtros.tipo %}Tipo: {{ filtros.tipo|capfirst }}{% elif filtros.q %}Búsqueda: «{{ filtros.q }}»{% else %}Prendas del catálogo de ATELIER.{% endif %}
+          </p>
+        </div>
+        <span style="color:var(--gris-texto);font-size:.9rem">{{ pagina.paginator.count }} prenda{{ pagina.paginator.count|pluralize }}</span>
+      </div>
+
+      {% if error_api %}
+        <div class="nota-demo" role="alert">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+          <div>
+            <strong>No se pudo cargar el catálogo.</strong>
+            {{ error_api }}
+            Revisa que el backend esté en marcha y que <code>API_BASE_URL</code> apunte a él.
+          </div>
+        </div>
+      {% endif %}
+
+      <form class="filtros" method="get" action="{% url 'catalogo:lista' %}">
+        <input type="search" name="q" value="{{ filtros.q }}" placeholder="Buscar por nombre o descripción…" aria-label="Buscar">
+        <select name="tipo" aria-label="Tipo de prenda">
+          <option value="">Todo tipo</option>
+          {% for t in tipos %}
+            <option value="{{ t }}" {% if filtros.tipo == t %}selected{% endif %}>{{ t|capfirst }}</option>
+          {% endfor %}
+        </select>
+        <select name="estilo" aria-label="Estilo">
+          <option value="">Todo estilo</option>
+          {% for est in estilos %}
+            <option value="{{ est }}" {% if filtros.estilo == est %}selected{% endif %}>{{ est|capfirst }}</option>
+          {% endfor %}
+        </select>
+        <button class="btn btn-suave btn-compacto" type="submit">Filtrar</button>
+        {% if filtros.q or filtros.tipo or filtros.estilo %}
+          <a class="btn btn-ghost btn-compacto" href="{% url 'catalogo:lista' %}">Limpiar</a>
+        {% endif %}
+      </form>
+
+      {% if pagina.object_list %}
+        <div class="rejilla">
+          {% for producto in pagina.object_list %}
+            {% include 'partials/producto_card.html' %}
+          {% endfor %}
+        </div>
+      {% elif error_api %}
+        <div class="vacio">
+          <h3>Catálogo no disponible</h3>
+          <p>Cuando el backend responda, aquí aparecerán las prendas registradas.</p>
+        </div>
+      {% else %}
+        <div class="vacio">
+          <div class="vacio-icono">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+          </div>
+          <h3>Sin resultados</h3>
+          <p>No encontramos prendas con esos criterios. Prueba con otra búsqueda o limpia los filtros.</p>
+          <a class="btn btn-primario" href="{% url 'catalogo:lista' %}">Ver todo el catálogo</a>
+        </div>
+      {% endif %}
+
+      {% include 'partials/paginacion.html' %}
+    </div>
+  </section>
+{% endblock %}

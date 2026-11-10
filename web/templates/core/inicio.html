@@ -1,0 +1,202 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block contenido %}
+
+  {% if error_api %}
+    <section class="seccion" style="padding-bottom:0">
+      <div class="contenedor">
+        <div class="nota-demo" role="alert">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+          <div>
+            <strong>El catálogo no está disponible.</strong>
+            {{ error_api }}
+            Revisa que el backend esté en marcha y que <code>API_BASE_URL</code> apunte a él.
+          </div>
+        </div>
+      </div>
+    </section>
+  {% endif %}
+
+  <!-- Hero editorial -->
+  <section class="hero hero-editorial">
+    <div class="contenedor hero-editorial-grid">
+      <div class="hero-contenido">
+        <span class="hero-eyebrow">Inteligencia textil · Colección de temporada</span>
+        <h1 class="hero-titulo">Del hilo a la idea. De la idea a la prenda.</h1>
+        <p class="hero-texto">ATELIER reúne catálogo, tendencias e inteligencia artificial para convertir tu inspiración en propuestas textiles reales y producibles.</p>
+        <div class="hero-acciones">
+          <a class="btn btn-claro" href="{% url 'cuentas:acceder' %}">Iniciar sesión</a>
+          <a class="btn btn-borde-claro" href="{% url 'cuentas:registro' %}">Crear cuenta</a>
+        </div>
+        <p class="hero-nota">Explora el catálogo y las tendencias sin registrarte. Crea tu cuenta cuando quieras guardar tus ideas.</p>
+      </div>
+      <div class="hero-editorial-imagen">
+        {% if producto_portada.imagen %}
+          <img src="{{ producto_portada.imagen.url }}" alt="Pieza editorial de ATELIER">
+        {% else %}
+          <img src="{% static 'img/placeholder.svg' %}" alt="Pieza editorial de ATELIER">
+        {% endif %}
+        <span class="hero-editorial-sello">Editorial ATELIER</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Ventajas -->
+  <section class="seccion">
+    <div class="contenedor">
+      <div class="seccion-cabecera">
+        <div>
+          <h2 class="seccion-titulo">Una plataforma pensada para crear</h2>
+          <p class="seccion-subtitulo" style="margin-bottom:0">Explora sin límites y guarda tu proceso cuando estés listo.</p>
+        </div>
+      </div>
+      <div class="ventajas">
+        <div class="ventaja revelar">
+          <h3>Diseño asistido por IA</h3>
+          <p>Describe tu idea y recibe propuestas que respetan las tendencias y el inventario real de la casa.</p>
+        </div>
+        <div class="ventaja revelar">
+          <h3>Catálogo transparente</h3>
+          <p>Prendas con su tipo, estilo, colores y tela, tal como están registradas en la API del backend.</p>
+        </div>
+        <div class="ventaja revelar">
+          <h3>Tendencias de temporada</h3>
+          <p>Colores, tejidos y estilos con su popularidad para orientar tus próximas colecciones.</p>
+        </div>
+        <div class="ventaja revelar">
+          <h3>Tu espacio privado</h3>
+          <p>Con una cuenta guardas diseños, favoritos y colecciones en un dashboard personal.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tendencias destacadas -->
+  <section class="seccion fondo-claro">
+    <div class="contenedor">
+      <div class="seccion-cabecera">
+        <div>
+          <h2 class="seccion-titulo">Tendencias de la temporada</h2>
+          <p class="seccion-subtitulo" style="margin-bottom:0">Lo que marca el tono de las próximas colecciones.</p>
+        </div>
+        <a class="enlace-cabecera" href="{% url 'tendencias:lista' %}">Ver todas →</a>
+      </div>
+      <div class="chips">
+        {% for tendencia in tendencias_moda %}
+          <a class="chip revelar" href="{% url 'tendencias:lista' %}" style="--order: {{ forloop.counter }}">
+            {% if tendencia.color %}<span class="burbuja" style="background:{{ tendencia.color }}"></span>{% endif %}
+            {{ tendencia.nombre }}
+            <span class="chip-popularidad">{{ tendencia.popularidad }}%</span>
+          </a>
+        {% empty %}
+          <p style="color: var(--gris-texto)">Aún no hay tendencias registradas.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <!-- Diseñador IA -->
+  <section class="seccion fondo-marino">
+    <div class="contenedor disenador-presentacion">
+      <div>
+        <span class="hero-eyebrow">Diseñador IA</span>
+        <h2 class="seccion-titulo" style="color:#fff">Tu idea, convertida en propuestas</h2>
+        <p class="seccion-subtitulo" style="color:#b9c8d6">Cuéntale a ATELIER qué imaginas y recibe alternativas coherentes con las tendencias y el stock disponible. Con tu cuenta, cada propuesta queda guardada en tu historial y en tus colecciones.</p>
+        <div class="hero-acciones">
+          <a class="btn btn-claro" href="{% url 'disenador:asistente' %}">Probar el Diseñador IA</a>
+          <a class="btn btn-borde-claro" href="{% url 'cuentas:registro' %}">Crear cuenta para guardar</a>
+        </div>
+      </div>
+      <ul class="disenador-pasos">
+        <li><span>1</span> Describe la prenda que imaginas.</li>
+        <li><span>2</span> Elige estilo, temporada y paleta.</li>
+        <li><span>3</span> Recibe propuestas y guarda tus favoritas.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Piezas destacadas -->
+  <section class="seccion">
+    <div class="contenedor">
+      <div class="seccion-cabecera">
+        <div>
+          <h2 class="seccion-titulo">Piezas destacadas</h2>
+          <p class="seccion-subtitulo" style="margin-bottom:0">Prendas registradas en la API de ATELIER.</p>
+        </div>
+        <a class="enlace-cabecera" href="{% url 'catalogo:lista' %}">Todo el catálogo →</a>
+      </div>
+      <div class="rejilla">
+        {% for producto in destacados %}
+          {% include 'partials/producto_card.html' %}
+        {% empty %}
+          <div class="vacio"><p>No hay productos destacados todavía.</p></div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <!-- Colecciones recomendadas -->
+  <section class="seccion fondo-claro">
+    <div class="contenedor">
+      <div class="seccion-cabecera">
+        <div>
+          <h2 class="seccion-titulo">Colecciones recomendadas</h2>
+          <p class="seccion-subtitulo" style="margin-bottom:0">Ideas curadas para inspirar tu próxima cápsula.</p>
+        </div>
+      </div>
+      <div class="rejilla-estrecha">
+        {% for coleccion in colecciones %}
+          <a class="carta revelar" href="{% url 'cuentas:coleccion_detalle' slug=coleccion.slug %}">
+            <div class="carta-imagen" style="aspect-ratio: 16/10">
+              {% if coleccion.imagen %}
+                <img src="{{ coleccion.imagen.url }}" alt="{{ coleccion.nombre }}">
+              {% else %}
+                <img src="{% static 'img/placeholder.svg' %}" alt="{{ coleccion.nombre }}">
+              {% endif %}
+            </div>
+            <div class="carta-cuerpo">
+              <span class="carta-categoria">Colección · ATELIER</span>
+              <h3 class="carta-nombre">{{ coleccion.nombre }}</h3>
+              <p class="carta-descripcion">{{ coleccion.descripcion|truncatewords:16 }}</p>
+            </div>
+          </a>
+        {% empty %}
+          <p style="color: var(--gris-texto)">Aún no hay colecciones recomendadas.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <!-- Novedades -->
+  <section class="seccion">
+    <div class="contenedor">
+      <div class="seccion-cabecera">
+        <div>
+          <h2 class="seccion-titulo">Novedades del catálogo</h2>
+          <p class="seccion-subtitulo" style="margin-bottom:0">Lo último registrado en el catálogo del backend.</p>
+        </div>
+      </div>
+      <div class="rejilla">
+        {% for producto in nuevas %}
+          {% include 'partials/producto_card.html' %}
+        {% empty %}
+          <div class="vacio"><p>No hay novedades todavía.</p></div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <!-- Llamado final -->
+  <section class="seccion cta-final">
+    <div class="contenedor centrado">
+      <h2 class="seccion-titulo">Tu próximo diseño empieza aquí</h2>
+      <p class="seccion-subtitulo">Inicia sesión o crea tu cuenta para guardar tus ideas, crear colecciones y personalizar tu experiencia en ATELIER.</p>
+      <div class="hero-acciones" style="justify-content:center">
+        <a class="btn btn-primario" href="{% url 'cuentas:acceder' %}">Iniciar sesión</a>
+        <a class="btn btn-ghost" href="{% url 'cuentas:registro' %}">Crear cuenta</a>
+      </div>
+    </div>
+  </section>
+
+{% endblock %}

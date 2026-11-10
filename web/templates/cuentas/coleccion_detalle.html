@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block titulo %}{{ coleccion.nombre }} · ATELIER{% endblock %}
+
+{% block contenido %}
+  <section class="seccion">
+    <div class="contenedor">
+      <p><a class="enlace-cabecera" href="{% if es_propia %}{% url 'cuentas:perfil' %}{% else %}{% url 'core:inicio' %}{% endif %}">← Volver</a></p>
+
+      <div class="seccion-cabecera">
+        <div>
+          <h1 class="seccion-titulo">{{ coleccion.nombre }}</h1>
+          {% if coleccion.es_recomendada %}
+            <span class="insignia insignia-tendencia" style="margin-bottom:.6rem;display:inline-block">Curada por ATELIER</span>
+          {% endif %}
+          <p class="seccion-subtitulo" style="margin-bottom:0">{{ coleccion.descripcion }}</p>
+          <p style="color:var(--gris-texto);font-size:.9rem;margin-top:.5rem">{{ coleccion.productos.count }} producto{{ coleccion.productos.count|pluralize }}</p>
+        </div>
+        {% if es_propia %}
+          <div class="accesos-cuenta" style="gap:.5rem;align-items:center">
+            <form method="post" action="{% url 'cuentas:coleccion_agregar_producto' slug=coleccion.slug %}" style="display:flex;gap:.5rem;align-items:center">
+              {% csrf_token %}
+              <select name="producto_id" required aria-label="Producto a añadir">
+                <option value="">Añadir producto…</option>
+                {% for producto in productos_todos %}
+                  <option value="{{ producto.pk }}">{{ producto.nombre }}</option>
+                {% endfor %}
+              </select>
+              <button class="btn btn-suave btn-compacto" type="submit">Añadir</button>
+            </form>
+            <form method="post" action="{% url 'cuentas:coleccion_eliminar' slug=coleccion.slug %}">
+              {% csrf_token %}
+              <button class="btn btn-peligro btn-compacto" type="submit" data-confirmar="¿Eliminar esta colección? Esta acción no se puede deshacer.">Eliminar</button>
+            </form>
+          </div>
+        {% endif %}
+      </div>
+
+      {% if coleccion.productos.all %}
+        <div class="rejilla">
+          {% for producto in coleccion.productos.all %}
+            <article class="carta">
+              <a href="{{ producto.get_absolute_url }}">
+                <div class="carta-imagen">
+                  {% if producto.imagen %}
+                    <img src="{{ producto.imagen.url }}" alt="{{ producto.nombre }}" loading="lazy">
+                  {% else %}
+                    <img src="{% static 'img/placeholder.svg' %}" alt="{{ producto.nombre }}" loading="lazy">
+                  {% endif %}
+                </div>
+                <div class="carta-cuerpo">
+                  <span class="carta-categoria">{{ producto.categoria.nombre }}</span>
+                  <h3 class="carta-nombre">{{ producto.nombre }}</h3>
+                  <div class="carta-pie">
+                    <span class="carta-precio">$ {{ producto.precio|floatformat:2 }}</span>
+                  </div>
+                </div>
+              </a>
+              {% if es_propia %}
+                <form method="post" action="{% url 'cuentas:coleccion_quitar_producto' slug=coleccion.slug %}" style="padding:0 1.15rem 1.1rem">
+                  {% csrf_token %}
+                  <input type="hidden" name="producto_id" value="{{ producto.pk }}">
+                  <button class="btn btn-ghost btn-bloque btn-compacto" type="submit">Quitar de la colección</button>
+                </form>
+              {% endif %}
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="vacio">
+          <div class="vacio-icono">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/></svg>
+          </div>
+          <h3>Colección vacía</h3>
+          <p>Explora el catálogo y añade productos a esta colección.</p>
+          <a class="btn btn-primario" href="{% url 'catalogo:lista' %}">Ir al catálogo</a>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+{% endblock %}

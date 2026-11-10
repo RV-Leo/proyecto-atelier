@@ -32,7 +32,7 @@ App móvil (Kotlin / Android) ──┐
                                ├──> API REST (Spring Boot) ──> Gateway IA (Django) ──> Modelos Qwen
 Aplicación web (Django) ───────┘                │                 
                                                 v
-                                  Base de datos (PostgreSQL propuesto)
+                                  Base de datos PostgreSQL (atelier)
 ```
 
 PostgreSQL es la base de datos del backend (rama `feature/backend-api-inventario`). La web y el móvil **no se conectan a ella**: consumen la API por HTTP. Ver [`docs/base-de-datos.md`](docs/base-de-datos.md).
@@ -68,166 +68,53 @@ atelier/
 2. Entra en la carpeta del módulo en el que vas a trabajar y sigue las instrucciones de su guía.
 3. Crea un archivo `.env` a partir de `.env.example`. No subas tu `.env` a GitHub.
 
-## Integración con la API (web y móvil)
+## Web: catálogo e inventario desde la API
 
-> **Regla:** los datos de negocio (prendas, materiales, tendencias) viven en PostgreSQL `atelier` y solo los escribe el backend. La web y el móvil **no se conectan a la base de datos ni crean tablas de producto propias**: piden todo por HTTP.
+La web ya no lee prendas ni materiales de su propia base. `web/catalogo/views.py` usa `web/catalogo/api_cliente.py`, que llama a la API del backend con HTTP Basic. Django conserva SQLite **solo para sus tablas internas** (`auth_user`, sesiones, admin).
 
-### Contrato de la API
-
-- Base local: `http://localhost:8080/api/v1`
-- Autenticación: HTTP Basic (`atelier` / `atelier-dev` en desarrollo)
-- `pagina` es **base 1**; si se omite, la API devuelve todo en una sola página.
-- `tamano` por defecto 20, máximo 100.
-
-| Método | Endpoint | Uso |
-|---|---|---|
-| `GET` | `/prendas?pagina=1&tamano=12&q=&tipo=&estilo=&estado=` | Catálogo con búsqueda y filtros |
-| `GET` | `/prendas/slug/{slug}` | Detalle de una prenda |
-| `GET` | `/materiales?pagina=1&tamano=12&q=&estado=&activo=` | Inventario |
-| `GET` | `/tendencias?pagina=1&tamano=12` | Tendencias |
-| `POST` | `/prendas` | Crear una prenda |
-
-Respuesta paginada:
-
-```json
-{
-  "items": [ ... ],
-  "pagina": 1,
-  "tamano": 12,
-  "total": 3,
-  "totalPaginas": 1,
-  "primera": true,
-  "ultima": true
-}
-```
-
-### Web (Django) — qué cambiar
-
-Hoy `web/catalogo/views.py` lee `Producto.objects.all()` y `models.py` define `Producto`, `Categoria` y `Material` propios. Eso duplica los datos. Pasos:
-
-1. Agregar al `.env`:
+1. Levanta el backend en `http://localhost:8080` (ver su guía).
+2. Copia `web/.env.example` a `web/.env` y ajusta:
 
 ```env
 API_BASE_URL=http://localhost:8080/api/v1
 API_USER=atelier
 API_PASSWORD=atelier-dev
+API_TIMEOUT=120
 ```
 
-2. Crear `web/catalogo/api_cliente.py`:
+3. Instala dependencias y prepara las tablas internas:
 
-```python
-import os
-import requests
-
-API = os.environ.get("API_BASE_URL", "http://localhost:8080/api/v1")
-AUTH = (os.environ.get("API_USER", "atelier"),
-        os.environ.get("API_PASSWORD", "atelier-dev"))
-
-def listar_prendas(pagina=1, tamano=12, **filtros):
-    params = {"pagina": pagina, "tamano": tamano, **filtros}
-    r = requests.get(f"{API}/prendas", params=params, auth=AUTH, timeout=5)
-    r.raise_for_status()
-    return r.json()          # {items, pagina, tamano, total, totalPaginas, ...}
-
-def prenda_por_slug(slug):
-    r = requests.get(f"{API}/prendas/slug/{slug}", auth=AUTH, timeout=5)
-    r.raise_for_status()
-    return r.json()
+```bash
+pip install -r web/requirements.txt
+python manage.py migrate
+python manage.py runserver
 ```
 
-3. En `views.py`, reemplazar el ORM por el cliente:
+Qué consume la web:
 
-```python
-from . import api_cliente
+| Vista | Endpoint |
+|---|---|
+| Portada (`/`) | `GET /prendas?pagina=1&tamano=12` |
+| Catálogo (`/catalogo/`) | `GET /prendas?pagina=&tamano=12&q=&tipo=&estilo=` |
+| Detalle (`/catalogo/producto/<slug>/`) | `GET /prendas/slug/<slug>` |
+| Inventario (`/catalogo/inventario/`) | `GET /materiales?q=&estado=` |
+| Informes (admin) | `GET /prendas` y `GET /materiales` |
 
-def lista(request):
-    datos = api_cliente.listar_prendas(
-        pagina=request.GET.get("pagina", 1),
-        q=request.GET.get("q", ""),
-        tipo=request.GET.get("tipo", ""),
-    )
-    return render(request, "catalogo/lista.html", {"pagina": datos})
+Notas:
 
-def detalle(request, slug):
-    return render(request, "catalogo/detalle.html",
-                  {"prenda": api_cliente.prenda_por_slug(slug)})
-```
+- `pagina` es **base 1**; `tamano` por defecto 20 y máximo 100.
+- Django llama a la API desde el servidor, así que **no hace falta CORS**.
+- Si la API no responde, las vistas muestran un aviso y no un error 500.
+- Los campos que la API todavía no expone (precio, stock, imagen, favoritos) no se inventan: se ocultan en la interfaz.
+- Pruebas sin backend ni PostgreSQL: `python manage.py test catalogo core`.
 
-4. Dejar de usar los modelos `Producto`/`Categoria`/`Material` para el catálogo. Django puede conservar su base **solo para tablas internas** (`auth_user`, sesiones, admin), en `atelier_web`.
-5. Probar con `responses` o `requests-mock`: no hace falta backend ni PostgreSQL.
+### Móvil (Kotlin) — plan futuro
 
-> Como Django llama a la API desde el servidor, **no se necesita CORS**. Solo haría falta si el navegador llamara a la API directamente.
+Hoy el catálogo móvil usa `DatosFake.productos`. Retrofit ya está en el proyecto, pero solo se usa para el chat de IA (`ClienteApiIa`). Para conectarlo al backend:
 
-### Móvil (Kotlin) — qué cambiar
-
-Hoy el catálogo usa `DatosFake.productos`. Retrofit ya está en el proyecto, pero solo se usa para el chat de IA (`ClienteApiIa`). Pasos:
-
-1. Crear `data/network/ServicioApiAtelier.kt`:
-
-```kotlin
-interface ServicioApiAtelier {
-    @GET("api/v1/prendas")
-    suspend fun listarPrendas(
-        @Query("pagina") pagina: Int = 1,
-        @Query("tamano") tamano: Int = 12,
-        @Query("q") q: String? = null,
-        @Query("tipo") tipo: String? = null
-    ): PaginaPrendas
-}
-```
-
-2. Crear el cliente con Basic auth:
-
-```kotlin
-object ClienteApiAtelier {
-    // En el emulador, 10.0.2.2 es el localhost de la PC.
-    private const val URL_BASE = "http://10.0.2.2:8080/"
-    private const val USUARIO = "atelier"
-    private const val CLAVE = "atelier-dev"
-
-    val servicio: ServicioApiAtelier by lazy {
-        Retrofit.Builder()
-            .baseUrl(URL_BASE)
-            .addConverterFactory(GsonConverterFactory.create())
-            .client(OkHttpClient.Builder()
-                .addInterceptor { chain ->
-                    val credencial = Credentials.basic(USUARIO, CLAVE)
-                    chain.proceed(chain.request().newBuilder()
-                        .header("Authorization", credencial)
-                        .build())
-                }.build())
-            .build()
-            .create(ServicioApiAtelier::class.java)
-    }
-}
-```
-
-3. Modelar la respuesta (los nombres deben coincidir con el JSON):
-
-```kotlin
-data class PaginaPrendas(
-    val items: List<PrendaDto>,
-    val pagina: Int,
-    val total: Int,
-    val totalPaginas: Int
-)
-
-data class PrendaDto(
-    val id: Long,
-    val nombre: String,
-    val slug: String,
-    val tipoPrenda: String,
-    val estilo: String?,
-    val colores: String?,
-    val tela: String?,
-    val descripcion: String?,
-    val estado: String
-)
-```
-
-4. Reemplazar `DatosFake.productos` en `HomeScreen` y `DetalleProductoScreen` por llamadas a `ClienteApiAtelier.servicio`.
-5. Para desarrollo local con HTTP sin TLS, agregar `android:usesCleartextTraffic="true"` en el `AndroidManifest.xml` (solo debug).
-6. Probar con `MockWebServer`: no hace falta backend ni PostgreSQL.
+1. Crear `data/network/ServicioApiAtelier.kt` con Retrofit y Basic auth (`atelier` / `atelier-dev`).
+2. Reemplazar `DatosFake.productos` en `HomeScreen` y `DetalleProductoScreen` por llamadas a la API.
+3. Para desarrollo local con HTTP sin TLS, agregar `android:usesCleartextTraffic="true"` en el `AndroidManifest.xml` (solo debug).
 
 ### Pruebas: quién necesita qué
 
@@ -236,7 +123,7 @@ data class PrendaDto(
 | Web con mocks (`responses`) | No | No |
 | Móvil con `MockWebServer` | No | No |
 | Integración real web/móvil | No en tu máquina | Sí, local o compartido |
-| Tests del backend (37) | Sí | No |
+| Tests del backend | Sí | No |
 
 ### Lo que no se debe hacer
 
