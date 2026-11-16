@@ -148,7 +148,7 @@ class ProveedorBackend(ProveedorDiseno):
 
         imagenes = solicitar_backend(
             f'/api/v1/prendas/{prenda_id}/diseno/propuestas',
-            cuerpo={'cantidad': 3},
+            cuerpo={'cantidad': 1},
             timeout=getattr(settings, 'AI_BACKEND_IMAGE_TIMEOUT', 240),
         )
         if not isinstance(imagenes, list) or not imagenes:
