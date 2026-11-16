@@ -169,40 +169,46 @@ public class ClienteIaHttp implements ClienteIa {
     @Override
     public List<ImagenGenerada> generarImagenes(String prompt, int cantidad) {
         int pedidas = Math.max(1, Math.min(cantidad, 4));
-
-        Map<String, Object> cuerpo = Map.of(
-                "model", propiedades.modeloImagen(),
-                "prompt", prompt,
-                "n", pedidas,
-                "size", "1024x1024");
-
-        Map<?, ?> respuesta;
-        try {
-            respuesta = rest.post()
-                    .uri("/images/generations")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(cuerpo)
-                    .retrieve()
-                    .body(Map.class);
-        } catch (RestClientException e) {
-            // Se captura RestClientException y no solo ResourceAccessException:
-            // un 4xx o 5xx del servidor también es "no pude generar", y tendría
-            // que llegar como 503, no como 500 con el stack de Spring.
-            throw new IaNoDisponibleException(
-                    "El servidor de imágenes no respondió correctamente en " + propiedades.url()
-                            + ": " + e.getMessage(),
-                    e);
-        }
-
-        if (respuesta == null || !(respuesta.get("data") instanceof List<?> datos)) {
-            throw new IaNoDisponibleException(
-                    "El servidor de imágenes no devolvió ninguna imagen (respuesta inesperada)");
-        }
-
         List<ImagenGenerada> generadas = new ArrayList<>();
-        for (Object elemento : datos) {
+        List<String> imagenesBase64 = new ArrayList<>();
+
+        // Pollinations limita cada petición de generación a una imagen (n <= 1).
+        // Pedimos cada variante por separado y guardamos los archivos cuando todas
+        // las respuestas llegaron correctamente.
+        for (int indice = 0; indice < pedidas; indice++) {
+            Map<String, Object> cuerpo = Map.of(
+                    "model", propiedades.modeloImagen(),
+                    "prompt", prompt,
+                    "n", 1,
+                    "size", "1024x1024");
+
+            Map<?, ?> respuesta;
+            try {
+                respuesta = rest.post()
+                        .uri("/images/generations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(cuerpo)
+                        .retrieve()
+                        .body(Map.class);
+            } catch (RestClientException e) {
+                // Se captura RestClientException y no solo ResourceAccessException:
+                // un 4xx o 5xx del servidor también es "no pude generar", y tendría
+                // que llegar como 503, no como 500 con el stack de Spring.
+                throw new IaNoDisponibleException(
+                        "El servidor de imágenes no respondió correctamente en " + propiedades.url()
+                                + ": " + e.getMessage(),
+                        e);
+            }
+
+            if (respuesta == null || !(respuesta.get("data") instanceof List<?> datos) || datos.isEmpty()) {
+                throw new IaNoDisponibleException(
+                        "El servidor de imágenes no devolvió ninguna imagen (respuesta inesperada)");
+            }
+
+            Object elemento = datos.get(0);
             if (!(elemento instanceof Map<?, ?> item)) {
-                continue;
+                throw new IaNoDisponibleException(
+                        "El servidor de imágenes devolvió una respuesta con formato inesperado");
             }
             Object url = item.get("url");
             Object base64 = item.get("b64_json");
@@ -210,10 +216,17 @@ public class ClienteIaHttp implements ClienteIa {
             if (url instanceof String u && !u.isBlank()) {
                 generadas.add(new ImagenGenerada(u, prompt));
             } else if (base64 instanceof String b && !b.isBlank()) {
-                // Algunos servidores devuelven la imagen codificada en vez de una
-                // URL; hay que guardarla para poder servirla.
-                generadas.add(new ImagenGenerada(guardador.guardar(b), prompt));
+                imagenesBase64.add(b);
+            } else {
+                throw new IaNoDisponibleException(
+                        "El servidor de imágenes respondió pero sin imágenes utilizables");
             }
+        }
+
+        // Algunos servidores devuelven las imágenes codificadas en vez de URL.
+        // Se guardan después de que todas las peticiones terminaron correctamente.
+        for (String base64 : imagenesBase64) {
+            generadas.add(new ImagenGenerada(guardador.guardar(base64), prompt));
         }
 
         if (generadas.isEmpty()) {

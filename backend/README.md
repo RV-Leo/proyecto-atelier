@@ -80,7 +80,9 @@ La rama de origen contiene pruebas de integración para estos módulos. No se in
 3. Copia `src/main/resources/application-local.properties.example` como `application-local.properties`, reemplaza `PEGA_AQUI_TU_CLAVE_PRIVADA` y deja la base H2 local para desarrollo.
 4. Desde `backend`, ejecuta `mvnw.cmd spring-boot:run`. El backend queda en `http://localhost:8080`; la web ya apunta a esa dirección con las credenciales locales `atelier` / `atelier-dev`.
 
-La configuración de ejemplo usa `openai/gpt-5.4-nano` para el chat y `qwen/qwen-image-2.1` para generar imágenes. Puedes cambiar los modelos desde `application-local.properties` si tu cuenta no tiene acceso a ellos.
+La configuración local usa `openai/gpt-5.4-nano` para el chat y `tongyi-mai/z-image-turbo` para generar imágenes con Quest Pollen. Puedes cambiar los modelos desde `application-local.properties` si tu cuenta no tiene acceso a ellos.
+
+El diseñador solicita una imagen por envío. La API de Pollinations valida que el campo `n` de cada solicitud de generación sea como máximo `1`; el backend repite solicitudes individuales únicamente cuando otro consumidor pide varias variantes.
 
 ---
 
