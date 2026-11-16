@@ -1,5 +1,6 @@
 """Casos de uso del asistente de diseño."""
 
+from .ia_gateway import ClientePuenteIA
 from .models import Mensaje
 from .repositories import DisenadorRepository
 from .servicios import obtener_proveedor
@@ -8,9 +9,36 @@ from .servicios import obtener_proveedor
 class DisenoService:
     """Orquesta generación, persistencia y consulta de propuestas."""
 
-    def __init__(self, repository=None, proveedor=None):
+    def __init__(self, repository=None, proveedor=None, puente_ia=None):
         self.repository = repository or DisenadorRepository()
         self.proveedor = proveedor or obtener_proveedor
+        self.puente_ia = puente_ia or ClientePuenteIA()
+
+    def conversar(self, usuario, texto, conversacion_id=None):
+        """Envía el turno al puente de IA y guarda la conversación del usuario."""
+        conversacion = (
+            self.repository.conversacion_usuario(usuario, conversacion_id)
+            if conversacion_id else None
+        )
+        historial = []
+        if conversacion:
+            historial = [
+                {
+                    'role': 'user' if mensaje.rol == Mensaje.Rol.USUARIO else 'assistant',
+                    'content': mensaje.texto[:4000],
+                }
+                for mensaje in self.repository.mensajes_recientes(conversacion)
+            ]
+
+        mensajes = (historial + [{'role': 'user', 'content': texto}])[-20:]
+        respuesta = self.puente_ia.conversar(mensajes)
+
+        if not conversacion:
+            titulo = texto[:60] + ('…' if len(texto) > 60 else '')
+            conversacion = self.repository.crear_conversacion(usuario, titulo)
+        self.repository.crear_mensaje(conversacion, Mensaje.Rol.USUARIO, texto)
+        self.repository.crear_mensaje(conversacion, Mensaje.Rol.ASISTENTE, respuesta)
+        return conversacion
 
     def estado_asistente(self, usuario, conversacion_id=None, propuestas_demo=None):
         conversacion = None

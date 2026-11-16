@@ -30,8 +30,8 @@
       <div class="nota-demo" style="margin-bottom:1.6rem">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
         <div>
-          <strong>Asistente en modo demostración.</strong> Las propuestas que ves son simuladas y combinan tu descripción con el
-          inventario real del proyecto. La arquitectura está lista para conectar el modelo Qwen-Image cuando esté disponible.
+          <strong>Diseñador visual en modo demostración.</strong> Las propuestas visuales siguen siendo simuladas y combinan tu descripción
+          con el inventario del proyecto. El chat responde mediante el puente de IA cuando el backend está configurado.
         </div>
       </div>
 
@@ -94,12 +94,12 @@
             </p>
           </form>
 
-          <div class="tablero-conversacion carta-texto" style="max-height:none">
+          <div class="tablero-conversacion carta-texto" id="chat" style="max-height:none">
             <div class="conversacion-head">
-              <h3>Conversación</h3>
+              <h3>Chat con Atelier IA</h3>
               {% if conversacion %}<span style="font-size:.8rem;color:var(--gris-texto)">{{ conversacion.creada|date:'d/m/Y H:i' }}</span>{% endif %}
             </div>
-            <div class="conversacion-mensajes" style="max-height:340px;overflow-y:auto">
+            <div class="conversacion-mensajes" id="mensajes-chat" style="max-height:340px;overflow-y:auto">
               {% if conversacion %}
                 {% for mensaje in conversacion.mensajes.all %}
                   <div class="mensaje mensaje-{% if mensaje.rol == 'usuario' %}usuario{% else %}asistente{% endif %}">
@@ -108,9 +108,26 @@
                   </div>
                 {% endfor %}
               {% else %}
-                <p class="conversacion-vacia">Aún no has hecho ninguna consulta. Describe una idea para empezar.</p>
+                <p class="conversacion-vacia">Aún no hay mensajes. Escribe tu consulta para conversar con Atelier IA.</p>
               {% endif %}
             </div>
+            {% if user.is_authenticated %}
+              <form class="chat-form" method="post" action="{% url 'disenador:conversar' %}">
+                {% csrf_token %}
+                {% if conversacion %}<input type="hidden" name="conversacion_id" value="{{ conversacion.pk }}">{% endif %}
+                <div class="campo">
+                  <label for="mensaje-chat">Tu mensaje</label>
+                  <textarea id="mensaje-chat" name="mensaje" rows="3" maxlength="4000" required
+                    placeholder="Pregunta sobre telas, combinaciones, estilos o ideas de diseño…"></textarea>
+                </div>
+                <button class="btn btn-primario btn-bloque" type="submit">Enviar mensaje</button>
+              </form>
+            {% else %}
+              <div class="chat-form">
+                <p class="ayuda">Inicia sesión para conversar con la IA y guardar el historial.</p>
+                <a class="btn btn-primario btn-bloque" href="{% url 'cuentas:acceder' %}?next={{ request.path|urlencode }}#chat">Iniciar sesión</a>
+              </div>
+            {% endif %}
           </div>
         </div>
 

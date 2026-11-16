@@ -7,6 +7,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from .forms import DisenoForm
+from .ia_gateway import PuenteIAError
 from .services import DisenoService
 
 servicio_diseno = DisenoService()
@@ -59,6 +60,36 @@ def asistente(request):
         'propuestas': propuestas,
     }
     return render(request, 'disenador/asistente.html', contexto)
+
+
+@login_required
+@require_POST
+def conversar(request):
+    """Envía un mensaje al puente de IA y conserva el historial de la cuenta."""
+    texto = request.POST.get('mensaje', '').strip()
+    if not texto:
+        messages.error(request, 'Escribe un mensaje para conversar con Atelier IA.')
+        return redirect('disenador:asistente')
+    if len(texto) > 4000:
+        messages.error(request, 'El mensaje no puede superar los 4000 caracteres.')
+        return redirect('disenador:asistente')
+
+    conversacion_id = request.POST.get('conversacion_id') or None
+    if conversacion_id and not conversacion_id.isdecimal():
+        messages.error(request, 'No se encontró esa conversación.')
+        return redirect('disenador:asistente')
+    try:
+        conversacion = servicio_diseno.conversar(
+            request.user, texto, conversacion_id=conversacion_id
+        )
+    except PuenteIAError as error:
+        messages.error(request, str(error))
+        destino = reverse('disenador:asistente')
+        if conversacion_id:
+            destino += f'?c={conversacion_id}'
+        return redirect(f'{destino}#chat')
+
+    return redirect(f'{reverse("disenador:asistente")}?c={conversacion.pk}#chat')
 
 
 @login_required

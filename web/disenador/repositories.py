@@ -21,6 +21,10 @@ class DisenadorRepository:
     def crear_mensaje(self, conversacion, rol, texto):
         return Mensaje.objects.create(conversacion=conversacion, rol=rol, texto=texto)
 
+    def mensajes_recientes(self, conversacion, limite=19):
+        mensajes = list(conversacion.mensajes.order_by('-creada')[:limite])
+        return list(reversed(mensajes))
+
     def crear_propuesta(self, **datos):
         return PropuestaDiseno.objects.create(**datos)
 
