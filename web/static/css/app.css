@@ -364,6 +364,7 @@ p { margin: 0 0 1rem; }
 .mensaje-usuario { align-self: flex-end; background: var(--marino); color: var(--blanco); border-bottom-right-radius: 4px; }
 .mensaje-asistente { align-self: flex-start; background: var(--gris-claro); border-bottom-left-radius: 4px; }
 .conversacion-vacia { color: var(--gris-texto); font-size: 0.9rem; text-align: center; padding: 2rem 1rem; }
+.chat-ejemplos { margin: 0.55rem 0; padding-left: 1.2rem; }
 .chat-form { display: grid; gap: 0.8rem; padding: 0 1.2rem 1.2rem; }
 .chat-form textarea { width: 100%; min-height: 88px; resize: vertical; }
 

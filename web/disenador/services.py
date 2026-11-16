@@ -1,9 +1,11 @@
 """Casos de uso del asistente de diseño."""
 
+from django.core.files.base import ContentFile
+
 from .ia_gateway import ClientePuenteIA
 from .models import Mensaje
 from .repositories import DisenadorRepository
-from .servicios import obtener_proveedor
+from .servicios import ProveedorDemo, obtener_proveedor
 
 
 class DisenoService:
@@ -54,6 +56,10 @@ class DisenoService:
 
     def generar(self, usuario, resumen, opciones):
         proveedor = self.proveedor() if callable(self.proveedor) else self.proveedor
+        # Mantiene la generación de demostración para visitantes, cuya sesión
+        # no debe guardar imágenes pesadas ni necesita crear una cuenta en la API.
+        if not usuario.is_authenticated and getattr(proveedor, 'nombre', '') == 'backend':
+            proveedor = ProveedorDemo()
         resultado = proveedor.generar(resumen, opciones)
         propuestas = resultado['propuestas']
         conversacion = None
@@ -69,6 +75,12 @@ class DisenoService:
                 conversacion, Mensaje.Rol.ASISTENTE, f'{resultado["intro"]}\n{lista}'
             )
             for propuesta in propuestas:
+                imagen = propuesta.get('imagen')
+                if propuesta.get('imagen_bytes'):
+                    imagen = ContentFile(
+                        propuesta['imagen_bytes'],
+                        name=propuesta.get('imagen_nombre', 'propuesta-ia.png'),
+                    )
                 self.repository.crear_propuesta(
                     usuario=usuario,
                     conversacion=conversacion,
@@ -79,9 +91,9 @@ class DisenoService:
                     calidad=opciones['calidad'],
                     paleta=opciones['paleta'],
                     resultado_resumen=propuesta['resumen'],
-                    imagen=propuesta['imagen'],
+                    imagen=imagen,
                     es_favorita=False,
-                    es_demo=True,
+                    es_demo=resultado.get('demostracion', True),
                 )
         else:
             for propuesta in propuestas:

@@ -39,11 +39,14 @@ public class ClienteIaHttp implements ClienteIa {
     private static final Logger log = LoggerFactory.getLogger(ClienteIaHttp.class);
 
     private static final String ROL_SISTEMA =
-            "Eres el asistente de estilo y diseño textil de Atelier. Respondes siempre en español "
-                    + "y con lenguaje claro. Puedes orientar sobre outfits, combinaciones, telas, "
-                    + "calidad y cuidado de prendas. Si falta contexto, pregunta antes de asumir. "
-                    + "No inventes datos de inventario, precios ni disponibilidad; si no recibes "
-                    + "datos verificados, indícalo.";
+            "Eres Atelier IA, el asistente de moda y diseño textil. Respondes siempre en español "
+                    + "claro y amable. Puedes atender consultas sobre telas y sus usos, colores, "
+                    + "combinaciones, estilos, temporadas, tendencias y cuidado de prendas; también "
+                    + "puedes ayudar a desarrollar ideas de diseño. Si te preguntan qué haces, explica "
+                    + "estas capacidades y sugiere ejemplos concretos. No tienes acceso en esta conversación "
+                    + "a existencias, precios ni datos privados del inventario: no los inventes y dirige "
+                    + "a la persona al módulo Inventario para comprobarlos. Si falta contexto, pregunta "
+                    + "antes de asumir.";
 
     private final IaProperties propiedades;
     private final RestClient rest;
@@ -89,10 +92,12 @@ public class ClienteIaHttp implements ClienteIa {
     @Override
     public String construirPromptDeImagen(Prenda prenda) {
         String instruccion = """
-                Convierte esta idea de prenda en una instrucción en español para un modelo \
-                que genera imágenes de moda. Describe la prenda, el corte, los colores y la \
-                tela. Sé concreto y visual. No agregues marcas ni logos. Solo devuelve la \
-                instrucción, sin comillas ni explicaciones.
+                Convierte esta idea de prenda en una instrucción en español para crear una \
+                fotografía editorial realista del producto. Muestra la prenda completa, centrada, \
+                con el corte, los colores, la tela y los detalles claramente visibles; usa un \
+                maniquí invisible y un fondo de estudio neutro. No generes muestras de tela, \
+                texturas abstractas, collages, texto, marcas ni logos. Solo devuelve la instrucción, \
+                sin comillas ni explicaciones.
 
                 Nombre: %s
                 Tipo: %s

@@ -30,8 +30,8 @@
       <div class="nota-demo" style="margin-bottom:1.6rem">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
         <div>
-          <strong>Diseñador visual en modo demostración.</strong> Las propuestas visuales siguen siendo simuladas y combinan tu descripción
-          con el inventario del proyecto. El chat responde mediante el puente de IA cuando el backend está configurado.
+          <strong>Diseñador y chat conectados al backend de Atelier.</strong> Las propuestas generan imágenes con IA cuando el proveedor está configurado.
+          El chat responde consultas de moda y textiles; el stock exacto se revisa en el inventario.
         </div>
       </div>
 
@@ -108,7 +108,19 @@
                   </div>
                 {% endfor %}
               {% else %}
-                <p class="conversacion-vacia">Aún no hay mensajes. Escribe tu consulta para conversar con Atelier IA.</p>
+                <div class="mensaje mensaje-asistente">
+                  <strong>ATELIER IA</strong><br>
+                  ¡Hola! Puedo ayudarte con consultas sobre telas y sus usos, combinaciones de colores,
+                  estilos, temporadas y tendencias. También puedo ayudarte a desarrollar una idea de prenda
+                  y generar propuestas visuales desde el formulario.<br><br>
+                  Puedo responder preguntas como:
+                  <ul class="chat-ejemplos">
+                    <li>¿Qué tela recomiendas para un vestido de verano?</li>
+                    <li>¿Qué colores combinan con terracota?</li>
+                    <li>¿Cómo describo una chaqueta minimalista?</li>
+                  </ul>
+                  Para confirmar existencias o viabilidad de producción, revisa el inventario de ATELIER.
+                </div>
               {% endif %}
             </div>
             {% if user.is_authenticated %}
@@ -140,7 +152,7 @@
                 <article class="carta revelar visible">
                   <div class="carta-imagen">
                     <div class="carta-insignia">
-                      <span class="insignia insignia-demo">Demo</span>
+                      <span class="insignia {% if propuesta.es_demo or not propuesta.pk %}insignia-demo{% else %}insignia-nuevo{% endif %}">{% if propuesta.es_demo or not propuesta.pk %}Demo{% else %}IA{% endif %}</span>
                       {% if propuesta.es_favorita %}<span class="insignia insignia-nuevo">★ Favorita</span>{% endif %}
                     </div>
                     {% if propuesta.imagen.url %}

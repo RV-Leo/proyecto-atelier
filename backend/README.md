@@ -73,6 +73,15 @@ El backend cumple los dos roles que pide el README:
 
 La rama de origen contiene pruebas de integración para estos módulos. No se incorporan en este cambio acotado al chat web.
 
+## Puesta en marcha local del chat y las imágenes
+
+1. Instala **Java 21**. El backend usa Spring Boot 4 y no arranca con Java 8.
+2. Crea una clave privada de Pollinations en [enter.pollinations.ai](https://enter.pollinations.ai/keys). La API actual requiere autenticación para generar texto e imágenes; no guardes la clave en Git ni en el código de la web.
+3. Copia `src/main/resources/application-local.properties.example` como `application-local.properties`, reemplaza `PEGA_AQUI_TU_CLAVE_PRIVADA` y deja la base H2 local para desarrollo.
+4. Desde `backend`, ejecuta `mvnw.cmd spring-boot:run`. El backend queda en `http://localhost:8080`; la web ya apunta a esa dirección con las credenciales locales `atelier` / `atelier-dev`.
+
+La configuración de ejemplo usa `openai/gpt-5.4-nano` para el chat y `qwen/qwen-image-2.1` para generar imágenes. Puedes cambiar los modelos desde `application-local.properties` si tu cuenta no tiene acceso a ellos.
+
 ---
 
 ## 2. Decisión de integración: la web consume la API (Opción A)

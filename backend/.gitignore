@@ -34,3 +34,6 @@ build/
 
 ### Imagenes generadas por el puente de IA (artefactos de ejecucion) ###
 imagenes-diseno/
+data/
+*.mv.db
+!src/main/resources/application-local.properties.example

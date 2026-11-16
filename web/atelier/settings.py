@@ -158,7 +158,7 @@ MESSAGE_TAGS = {
 #          Las propuestas son simuladas y así se indican en la interfaz.
 # Para conectar un modelo real (p. ej. Qwen-Image) en el futuro, crear un
 # proveedor en disenador/servicios y cambiar este valor.
-AI_PROVEEDOR = os.environ.get('ATELIER_AI_PROVEEDOR', 'demo')
+AI_PROVEEDOR = os.environ.get('ATELIER_AI_PROVEEDOR', 'backend')
 AI_URL_BASE = os.environ.get('ATELIER_AI_URL_BASE', '')
 
 # Puente de chat de IA (API Spring Boot de Atelier).
@@ -166,3 +166,4 @@ AI_BACKEND_URL = os.environ.get('ATELIER_BACKEND_URL', 'http://localhost:8080')
 AI_BACKEND_USER = os.environ.get('ATELIER_BACKEND_USER', 'atelier')
 AI_BACKEND_PASSWORD = os.environ.get('ATELIER_BACKEND_PASSWORD', 'atelier-dev')
 AI_BACKEND_TIMEOUT = int(os.environ.get('ATELIER_BACKEND_TIMEOUT', '90'))
+AI_BACKEND_IMAGE_TIMEOUT = int(os.environ.get('ATELIER_BACKEND_IMAGE_TIMEOUT', '240'))

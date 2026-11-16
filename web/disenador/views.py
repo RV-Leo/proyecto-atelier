@@ -33,26 +33,26 @@ def asistente(request):
                 generado = servicio_diseno.generar(request.user, resumen, datos)
             except NotImplementedError as error:
                 messages.error(request, str(error))
-                return render(request, 'disenador/asistente.html', {
-                    'form': formulario, 'conversacion': None, 'propuestas': [],
-                })
+            except PuenteIAError as error:
+                messages.error(request, str(error))
+            else:
+                conversacion = generado['conversacion']
+                propuestas_generadas = generado['propuestas']
+                es_demo = generado['resultado'].get('demostracion', True)
+                if request.user.is_authenticated:
+                    mensajes_guardado = (
+                        'Tus propuestas de demostración se guardaron.'
+                        if es_demo else 'Tus imágenes generadas por IA se guardaron.'
+                    )
+                    messages.success(request, f'{mensajes_guardado} Explóralas y marca tus favoritas.')
+                    return redirect(f'{reverse("disenador:asistente")}?c={conversacion.pk}')
 
-            conversacion = generado['conversacion']
-            propuestas_generadas = generado['propuestas']
-            if request.user.is_authenticated:
-                messages.success(
+                request.session['propuestas_demo'] = propuestas_generadas
+                messages.info(
                     request,
-                    'Tus propuestas de demostración se guardaron. '
-                    'Explóralas y marca tus favoritas.',
+                    'Inicia sesión para guardar y reutilizar tus propuestas de diseño.',
                 )
-                return redirect(f'{reverse("disenador:asistente")}?c={conversacion.pk}')
-
-            request.session['propuestas_demo'] = propuestas_generadas
-            messages.info(
-                request,
-                'Inicia sesión para guardar y reutilizar tus propuestas de diseño.',
-            )
-            return redirect('disenador:asistente')
+                return redirect('disenador:asistente')
 
     contexto = {
         'form': formulario,

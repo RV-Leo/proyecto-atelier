@@ -7,11 +7,14 @@ Las propuestas de demostración se identifican claramente en la interfaz.
 """
 
 import random
+import re
+from urllib.parse import urlparse
 
 from django.conf import settings
 
 from catalogo.repositories import CatalogoRepository
 from core.placeholder import generar_textura_tela
+from .ia_gateway import PuenteIAError, descargar_imagen_backend, solicitar_backend
 
 SUFIJOS_DESCRIPCION = [
     'con acabados limpios y silueta relajada',
@@ -122,9 +125,65 @@ class ProveedorQwen(ProveedorDiseno):
         )
 
 
+class ProveedorBackend(ProveedorDiseno):
+    """Genera imágenes y guarda el resultado del backend de Atelier."""
+
+    nombre = 'backend'
+
+    def generar(self, resumen, opciones):
+        tipo = opciones.get('tipo_prenda', 'prenda')
+        estilo = opciones.get('estilo', 'minimalista')
+        solicitud = {
+            'nombre': resumen[:120] or f'{tipo} {estilo}',
+            'tipoPrenda': tipo,
+            'estilo': estilo,
+            'colores': opciones.get('paleta', ''),
+            'tela': opciones.get('tela', ''),
+            'descripcion': resumen,
+        }
+        prenda = solicitar_backend('/api/v1/prendas', cuerpo=solicitud)
+        prenda_id = prenda.get('id') if isinstance(prenda, dict) else None
+        if not prenda_id:
+            raise PuenteIAError('El backend no devolvió la prenda solicitada.')
+
+        imagenes = solicitar_backend(
+            f'/api/v1/prendas/{prenda_id}/diseno/propuestas',
+            cuerpo={'cantidad': 3},
+            timeout=getattr(settings, 'AI_BACKEND_IMAGE_TIMEOUT', 240),
+        )
+        if not isinstance(imagenes, list) or not imagenes:
+            raise PuenteIAError('El proveedor de IA no generó imágenes para esta idea.')
+
+        propuestas = []
+        for indice, imagen in enumerate(imagenes, start=1):
+            url = imagen.get('imagenUrl') if isinstance(imagen, dict) else None
+            if not url:
+                continue
+            contenido = descargar_imagen_backend(url)
+            sufijo = re.sub(r'[^a-zA-Z0-9]+', '-', f'{tipo}-{estilo}').strip('-').lower()
+            extension = urlparse(url).path.rsplit('.', 1)[-1].lower()
+            if extension not in {'png', 'jpg', 'jpeg', 'webp'}:
+                extension = 'png'
+            propuestas.append({
+                'titulo': f'Propuesta {indice} · {tipo.title()} {estilo.title()}',
+                'resumen': imagen.get('promptUsado') or resumen,
+                'imagen_bytes': contenido,
+                'imagen_nombre': f'propuesta-{prenda_id}-{indice}-{sufijo}.{extension}',
+                'materiales': 'Por verificar en el inventario',
+                'viabilidad': 'Pendiente de consulta al inventario',
+            })
+        if not propuestas:
+            raise PuenteIAError('El backend respondió, pero no devolvió imágenes utilizables.')
+        return {
+            'propuestas': propuestas,
+            'intro': 'Imágenes generadas por IA y guardadas en ATELIER.',
+            'demostracion': False,
+        }
+
+
 def obtener_proveedor():
     """Devuelve el proveedor configurado en settings.AI_PROVEEDOR."""
-    nombre = getattr(settings, 'AI_PROVEEDOR', 'demo')
-    if nombre == 'qwen':
-        return ProveedorQwen(getattr(settings, 'AI_URL_BASE', ''))
+    nombre = getattr(settings, 'AI_PROVEEDOR', 'backend')
+    if nombre in {'backend', 'qwen'}:
+        return ProveedorBackend()
     return ProveedorDemo()
