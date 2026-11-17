@@ -1,6 +1,7 @@
 package com.atelier.backend.ia;
 
 import java.util.List;
+import java.util.Map;
 
 import com.atelier.backend.api.dto.ViabilidadResponse;
 import com.atelier.backend.dominio.Prenda;
@@ -60,6 +61,31 @@ public interface ClienteIa {
 
     default String conversar(List<MensajeChat> mensajes, String contexto) {
         return conversar(mensajes);
+    }
+
+    /**
+     * Conversa dejando que el modelo pida herramientas reales del backend.
+     *
+     * <p>El proveedor ejecuta el bucle: manda la conversación con las
+     * declaraciones, recibe los {@code function_call}, delega la ejecución en
+     * {@code ejecutor} y devuelve el resultado al modelo hasta que responde con
+     * texto. Los proveedores que no soportan herramientas ignoran el catálogo y
+     * responden como en {@link #conversar(List, String)}.
+     *
+     * @param herramientas catálogo que el modelo puede pedir; nunca se ejecuta
+     *                     nada que no esté declarado aquí
+     * @param ejecutor      quien hace el trabajo real (stock, imágenes) y
+     *                     devuelve un resultado serializable para el modelo
+     */
+    default String conversar(List<MensajeChat> mensajes, String contexto,
+            List<Herramienta> herramientas, EjecutorHerramientas ejecutor) {
+        return conversar(mensajes, contexto);
+    }
+
+    /** Ejecuta una herramienta pedida por el modelo. */
+    @FunctionalInterface
+    interface EjecutorHerramientas {
+        Map<String, Object> ejecutar(String nombre, Map<String, Object> argumentos);
     }
 
     /** Edita una imagen de referencia con una instrucción textual. */

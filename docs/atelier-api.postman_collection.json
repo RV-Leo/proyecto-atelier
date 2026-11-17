@@ -1,0 +1,439 @@
+{
+  "info": {
+    "name": "ATELIER API",
+    "description": "Coleccion para probar la API del backend (Spring Boot). Importar en Postman o Insomnia.\n\nAntes de ejecutar:\n1. Levanta el backend en http://localhost:8080\n2. Revisa las variables: usuario=atelier y clave=atelier-dev\n3. Ejecuta en orden: Crear prenda -> Crear material -> Ficha tecnica -> Diseno con IA -> Viabilidad\n\nLa generacion de imagenes usa Pollinations.ai: tarda ~12 s y permite 1 imagen cada 45 s por IP. Por eso 'cantidad' va en 1.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "basic",
+    "basic": [
+      {
+        "key": "username",
+        "value": "{{usuario}}",
+        "type": "string"
+      },
+      {
+        "key": "password",
+        "value": "{{clave}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/api/v1"
+    },
+    {
+      "key": "usuario",
+      "value": "atelier"
+    },
+    {
+      "key": "clave",
+      "value": "atelier-dev"
+    },
+    {
+      "key": "prendaId",
+      "value": "1"
+    },
+    {
+      "key": "materialId",
+      "value": "1"
+    },
+    {
+      "key": "propuestaId",
+      "value": "1"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Salud y consultas",
+      "item": [
+        {
+          "name": "Salud",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/salud",
+            "description": "Comprueba que el backend responde (no toca la base de datos)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar prendas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/prendas?pagina=1&tamano=5",
+            "description": "Filtros opcionales: q, tipo, estilo, estado (BORRADOR, GENERANDO, GENERADA, ANALIZADA)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "if (r.contenido && r.contenido.length > 0) {",
+                  "  pm.collectionVariables.set('prendaId', r.contenido[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Obtener prenda por id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/prendas/{{prendaId}}"
+          }
+        },
+        {
+          "name": "Obtener prenda por slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/prendas/slug/vestido-boho-de-lino"
+          }
+        },
+        {
+          "name": "Listar materiales",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/materiales?pagina=1&tamano=5&activo=true",
+            "description": "Filtros opcionales: q, estado (AGOTADO, BAJO, DISPONIBLE), activo."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.contenido && r.contenido.length > 0) {",
+                  "  pm.collectionVariables.set('materialId', r.contenido[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar tendencias",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/tendencias?pagina=1&tamano=5"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Crear datos",
+      "item": [
+        {
+          "name": "Crear prenda",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Vestido boho de lino\",\n  \"tipoPrenda\": \"vestido\",\n  \"estilo\": \"boho\",\n  \"colores\": \"terracota, beige\",\n  \"tela\": \"lino\",\n  \"descripcion\": \"Vestido fluido para primavera-verano\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/prendas",
+            "description": "Obligatorios: nombre, tipoPrenda, estilo. Guarda el id devuelto en {{prendaId}}."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('creada (201)', () => pm.response.to.have.status(201));",
+                  "const r = pm.response.json();",
+                  "pm.collectionVariables.set('prendaId', r.id);",
+                  "console.log('prendaId =', r.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear material",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Lino natural\",\n  \"tipo\": \"Tela\",\n  \"color\": \"beige\",\n  \"unidad\": \"METRO\",\n  \"stock\": 30,\n  \"stockMinimo\": 5,\n  \"proveedor\": \"Textiles Andinos\",\n  \"precioUnitario\": 12.5,\n  \"activo\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/materiales",
+            "description": "unidad: METRO, UNIDAD, KILOGRAMO o ROLLO. Guarda el id en {{materialId}}."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('creado (201)', () => pm.response.to.have.status(201));",
+                  "const r = pm.response.json();",
+                  "pm.collectionVariables.set('materialId', r.id);",
+                  "console.log('materialId =', r.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Asignar material a la prenda",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"materialId\": {{materialId}},\n  \"cantidadRequerida\": 3.5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/prendas/{{prendaId}}/materiales",
+            "description": "Ficha tecnica de la prenda: material y cantidad necesaria."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('creada (201)', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear tendencia",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Siluetas oversize en denim\",\n  \"region\": \"EUROPA\",\n  \"fuente\": \"PINTEREST\",\n  \"urlOrigen\": \"https://www.pinterest.com/pin/123456789/\",\n  \"imagenUrl\": \"https://example.com/tendencia.jpg\",\n  \"colores\": \"azul marino, crudo\",\n  \"estilo\": \"oversize\",\n  \"tela\": \"denim\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/tendencias",
+            "description": "region: EUROPA, AMERICA o GLOBAL. fuente: PINTEREST, TIENDA_MARCA u OTRO."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('creada (201)', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Diseno con IA",
+      "item": [
+        {
+          "name": "Chat del asistente (herramientas)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"¿Puedo producir la prenda {{prendaId}}? ¿Alcanza el stock?\"\n    }\n  ],\n  \"contexto\": \"Catalogo: la prenda {{prendaId}} esta disponible.\"\n}"
+            },
+            "url": "{{baseUrl}}/ia/chat",
+            "description": "Gemini decide si llama a consultar_stock o generar_imagen. La respuesta trae respuesta e imagenes (URLs generadas en el turno)."
+          }
+        },
+        {
+          "name": "Ver prompt (sin generar imagen)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/prendas/{{prendaId}}/diseno/prompt",
+            "description": "Gemini redacta el prompt. Responde fuente MODELO o PLANTILLA. No gasta imagen."
+          }
+        },
+        {
+          "name": "Generar propuestas",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cantidad\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/prendas/{{prendaId}}/diseno/propuestas",
+            "description": "Pollinations permite 1 imagen cada 45 s por IP: deja cantidad en 1. Tarda ~12 s. Guarda la primera propuesta en {{propuestaId}}."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('creadas (201)', () => pm.response.to.have.status(201));",
+                  "const r = pm.response.json();",
+                  "if (r.length > 0) {",
+                  "  pm.collectionVariables.set('propuestaId', r[0].id);",
+                  "  console.log('imagenUrl =', r[0].imagenUrl);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar propuestas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/prendas/{{prendaId}}/diseno/propuestas"
+          }
+        },
+        {
+          "name": "Seleccionar propuesta",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{baseUrl}}/prendas/{{prendaId}}/diseno/propuestas/{{propuestaId}}/seleccion",
+            "description": "No lleva cuerpo. Deselecciona las demas."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Viabilidad",
+      "item": [
+        {
+          "name": "Analizar viabilidad",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/viabilidad/{{prendaId}}",
+            "description": "No lleva cuerpo. Responde 200 aunque la prenda no sea viable."
+          }
+        },
+        {
+          "name": "Ficha tecnica con stock",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/viabilidad/{{prendaId}}/materiales"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Material: actualizar y borrar",
+      "item": [
+        {
+          "name": "Actualizar material",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Lino natural\",\n  \"tipo\": \"Tela\",\n  \"color\": \"beige\",\n  \"unidad\": \"METRO\",\n  \"stock\": 18,\n  \"stockMinimo\": 5,\n  \"proveedor\": \"Textiles Andinos\",\n  \"precioUnitario\": 13.9,\n  \"activo\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/materiales/{{materialId}}"
+          }
+        },
+        {
+          "name": "Borrar material (OJO: borra de la BD)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/materiales/{{materialId}}",
+            "description": "Elimina el material. Usalo solo con datos de prueba."
+          }
+        }
+      ]
+    }
+  ]
+}

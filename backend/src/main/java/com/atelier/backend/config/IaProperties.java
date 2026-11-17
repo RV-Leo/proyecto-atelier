@@ -1,6 +1,7 @@
 package com.atelier.backend.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 
 /**
  * Configuración del puente de IA.
@@ -37,6 +38,17 @@ public record IaProperties(
         String directorioImagenes,
         String urlImagen,
         String apiKeyImagen) {
+
+    /**
+     * Fija el constructor canónico como el de enlace de propiedades.
+     *
+     * <p>La clase tiene dos constructores por compatibilidad, y sin esta
+     * anotación Spring no sabe cuál usar y falla al arrancar. El de siete
+     * argumentos queda solo para las pruebas y el código viejo.
+     */
+    @ConstructorBinding
+    public IaProperties {
+    }
 
     /** Compatibilidad con las configuraciones anteriores del backend. */
     public IaProperties(

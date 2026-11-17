@@ -53,6 +53,12 @@ public class ClienteIaCompuesto implements ClienteIa {
     }
 
     @Override
+    public String conversar(List<MensajeChat> mensajes, String contexto,
+            List<Herramienta> herramientas, EjecutorHerramientas ejecutor) {
+        return texto.conversar(mensajes, contexto, herramientas, ejecutor);
+    }
+
+    @Override
     public ImagenGenerada editarImagen(String prompt, byte[] imagen, String contentType) {
         return imagenes.editar(prompt, imagen, contentType);
     }

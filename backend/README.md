@@ -39,6 +39,7 @@ El backend cumple los dos roles que pide el README:
 
 - `ClienteIa` → `ClienteGemini` para texto y `ClienteImagenPollinations` para imágenes; `ClienteIaCompuesto` separa ambas rutas.
 - `ClienteGemini` usa Gemini Interactions y su propia clave `GEMINI_API_KEY`.
+- `SkillAtelier` define el prompt de negocio y `CatalogoHerramientas` declara `consultar_stock` y `generar_imagen`. `AsistenteAtelier` ejecuta esas herramientas y devuelve texto + imágenes; el modelo nunca calcula stock por su cuenta.
 - `ClienteImagenPollinations` usa `POST /v1/images/generations` y `POST /v1/images/edits` con `POLLINATIONS_API_KEY`.
 - Las credenciales de Gemini y Pollinations nunca se envían al proveedor contrario. Las claves locales se mantienen en `application-local.properties`.
 - `GEMINI_MODELO_TEXTO=gemini-3.8-flash` responde el chat y `POLLINATIONS_MODELO_IMAGEN=microsoft/mai-image-2.6-flash` crea o edita imágenes.
@@ -79,12 +80,14 @@ El backend cumple los dos roles que pide el README:
 - CSRF deshabilitado, sin sesiones (clientes puros de API).
 - Errores: `400` (validación), `401` (sin auth), `404` (no existe), `409` (unicidad URL tendencia), `503` (servidor IA caído).
 
-#### Tests: 37 en verde
+#### Tests: 47 en verde
 
 - `ApiFlujoTests` — 9 integración contra PostgreSQL real.
 - `PuenteIaTests` — 7 pruebas del estado sin IA (mock + infra).
 - `ClienteIaHttpTests` — 11 pruebas unitarias del cliente HTTP con `MockRestServiceServer`.
 - `ApiCatalogoTests` — 9 pruebas nuevas de paginación, filtros y slug.
+- `ClienteGeminiTests` — 4 pruebas del bucle de herramientas.
+- `ClienteImagenPollinationsTests` — 6 pruebas del contrato de imágenes.
 
 ---
 

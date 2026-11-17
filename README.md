@@ -95,6 +95,24 @@ se muestra en /disenador/ e /disenador/historial/
 | `ia/ClienteIaCompuesto.java` | Enruta texto a Gemini e imágenes a Pollinations. |
 | `ia/GuardadorImagenes.java` | Guarda los bytes y elige la extensión por firma mágica (jpg/png/gif/webp). |
 | `ia/ConfigIa.java` | Registra el cliente compuesto y sirve `/imagenes/**` sin autenticación. |
+| `ia/skills/SkillAtelier.java` | Prompt de negocio: alcance, tono, reglas y cuándo usar cada herramienta. |
+| `ia/skills/CatalogoHerramientas.java` | Declaración de `generar_imagen` y `consultar_stock` para Gemini. |
+| `servicio/AsistenteAtelier.java` | Ejecuta las herramientas que pide Gemini y reúne texto e imágenes. |
+
+### Skills del asistente
+
+El chat de `/api/v1/ia/chat` no arma la respuesta con una plantilla: Gemini
+recibe el prompt de negocio de `SkillAtelier`, el catálogo de
+`CatalogoHerramientas` y el historial de la conversación. Cuando necesita datos
+reales pide una herramienta y el backend la ejecuta (`AsistenteAtelier`):
+
+- `consultar_stock`: ficha técnica y stock real de una prenda.
+- `generar_imagen`: una propuesta visual por turno, por el límite de Pollinations.
+
+El modelo no calcula stock ni inventa precios: solo interpreta lo que devuelve
+el backend. La respuesta incluye `imagenes` con las URLs generadas en el turno.
+Si el pedido queda fuera del negocio, el prompt indica responder en una frase y
+volver al diseño, sin improvisar temas externos.
 
 ### Generación y edición
 

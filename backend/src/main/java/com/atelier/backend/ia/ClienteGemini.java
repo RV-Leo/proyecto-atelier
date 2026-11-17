@@ -13,16 +13,32 @@ import org.springframework.web.client.RestClientException;
 
 import com.atelier.backend.config.IaProperties;
 import com.atelier.backend.dominio.Prenda;
+import com.atelier.backend.ia.skills.SkillAtelier;
+
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 /** Cliente de texto de Gemini mediante la API Interactions. */
 public class ClienteGemini implements ClienteIa {
 
+    /**
+     * Prompt para tareas internas (viabilidad): no necesita el alcance ni las
+     * herramientas del asistente, solo describir datos ya calculados.
+     */
     private static final String ROL_SISTEMA = """
             Eres Atelier IA, el asistente de moda y diseño textil. Respondes siempre en español,
             con lenguaje claro y amable. Usa los datos de catálogo recibidos en el contexto
             solo para responder sobre esos artículos. No inventes precios ni stock; si falta
             un dato, dilo con claridad.
             """;
+
+    /**
+     * Tope de vueltas modelo → herramienta → modelo. Evita que un modelo que
+     * insiste en pedir la misma herramienta deje la petición HTTP colgada.
+     */
+    private static final int MAX_PASOS_HERRAMIENTAS = 4;
+
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private final IaProperties propiedades;
     private final RestClient rest;
@@ -58,29 +74,77 @@ public class ClienteGemini implements ClienteIa {
         if (!disponible()) {
             throw new IaNoDisponibleException("Configura GEMINI_API_KEY para habilitar el chat.");
         }
+        List<Map<String, Object>> historial = construirHistorial(mensajes);
+        Map<?, ?> respuesta = enviar(historial, instruccion(ROL_SISTEMA, contexto), null);
+        return textoRequerido(respuesta);
+    }
 
-        List<Map<String, Object>> input = new ArrayList<>();
-        for (MensajeChat mensaje : mensajes) {
-            if (mensaje == null || mensaje.content() == null || mensaje.content().isBlank()) {
-                continue;
-            }
-            String tipo = "assistant".equalsIgnoreCase(mensaje.role()) ? "model_output" : "user_input";
-            input.add(Map.of(
-                    "type", tipo,
-                    "content", List.of(Map.of("type", "text", "text", mensaje.content()))));
+    /**
+     * Conversación con herramientas: Gemini decide cuándo consultar stock o
+     * generar una imagen, y el backend ejecuta lo que pide.
+     *
+     * <p>Se usa el modo sin estado ({@code store: false}) porque el backend ya
+     * conserva el historial de mensajes y no depende de interacciones previas.
+     */
+    @Override
+    public String conversar(List<MensajeChat> mensajes, String contexto,
+            List<Herramienta> herramientas, EjecutorHerramientas ejecutor) {
+        if (!disponible()) {
+            throw new IaNoDisponibleException("Configura GEMINI_API_KEY para habilitar el chat.");
         }
-        if (input.isEmpty()) {
+        if (herramientas == null || herramientas.isEmpty() || ejecutor == null) {
+            return conversar(mensajes, contexto);
+        }
+
+        List<Map<String, Object>> historial = construirHistorial(mensajes);
+        String sistema = instruccion(SkillAtelier.PROMPT, contexto);
+        List<Map<String, Object>> declaraciones = herramientas.stream()
+                .map(Herramienta::declaracion)
+                .toList();
+
+        for (int paso = 0; paso < MAX_PASOS_HERRAMIENTAS; paso++) {
+            Map<?, ?> respuesta = enviar(historial, sistema, declaraciones);
+            List<Map<String, Object>> llamadas = llamadasDeFuncion(respuesta);
+
+            if (llamadas.isEmpty()) {
+                return textoRequerido(respuesta);
+            }
+
+            // El modo sin estado exige devolver los pasos del modelo tal cual
+            // llegaron (incluidos los function_call) antes del resultado.
+            historial.addAll(pasos(respuesta));
+
+            for (Map<String, Object> llamada : llamadas) {
+                String nombre = String.valueOf(llamada.get("name"));
+                Map<String, Object> argumentos = mapa(llamada.get("arguments"));
+                Object resultado;
+                try {
+                    resultado = ejecutor.ejecutar(nombre, argumentos);
+                } catch (RuntimeException error) {
+                    resultado = Map.of("error", mensajeDe(error));
+                }
+                historial.add(resultadoDeFuncion(nombre, llamada.get("id"), resultado));
+            }
+        }
+
+        throw new IaNoDisponibleException("El asistente pidió herramientas demasiadas veces seguidas.");
+    }
+
+    /** Envía una interacción y devuelve el cuerpo de la respuesta. */
+    private Map<?, ?> enviar(List<Map<String, Object>> historial, String sistema,
+            List<Map<String, Object>> herramientas) {
+        if (historial.isEmpty()) {
             throw new IaNoDisponibleException("El chat no recibió mensajes para enviar a Gemini.");
         }
 
-        String instruccion = ROL_SISTEMA;
-        if (contexto != null && !contexto.isBlank()) {
-            instruccion += "\n\n" + contexto;
-        }
         Map<String, Object> cuerpo = new LinkedHashMap<>();
         cuerpo.put("model", propiedades.modeloTexto());
-        cuerpo.put("input", input);
-        cuerpo.put("system_instruction", instruccion);
+        cuerpo.put("store", false);
+        cuerpo.put("input", historial);
+        cuerpo.put("system_instruction", sistema);
+        if (herramientas != null && !herramientas.isEmpty()) {
+            cuerpo.put("tools", herramientas);
+        }
 
         try {
             Map<?, ?> respuesta = rest.post().uri("/interactions")
@@ -88,14 +152,76 @@ public class ClienteGemini implements ClienteIa {
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(cuerpo)
                     .retrieve().body(Map.class);
-            String texto = extraerTexto(respuesta);
-            if (texto == null || texto.isBlank()) {
+            if (respuesta == null) {
                 throw new IaNoDisponibleException("Gemini devolvió una respuesta vacía.");
             }
-            return texto.trim();
+            return respuesta;
         } catch (RestClientException error) {
             throw new IaNoDisponibleException("Gemini no respondió correctamente.", error);
         }
+    }
+
+    private List<Map<String, Object>> construirHistorial(List<MensajeChat> mensajes) {
+        List<Map<String, Object>> historial = new ArrayList<>();
+        if (mensajes == null) {
+            return historial;
+        }
+        for (MensajeChat mensaje : mensajes) {
+            if (mensaje == null || mensaje.content() == null || mensaje.content().isBlank()) {
+                continue;
+            }
+            String tipo = "assistant".equalsIgnoreCase(mensaje.role()) ? "model_output" : "user_input";
+            historial.add(Map.of(
+                    "type", tipo,
+                    "content", List.of(Map.of("type", "text", "text", mensaje.content()))));
+        }
+        return historial;
+    }
+
+    private String instruccion(String base, String contexto) {
+        return contexto == null || contexto.isBlank() ? base : base + "\n\n" + contexto;
+    }
+
+    /** Pasos {@code function_call} que el modelo pidió ejecutar. */
+    private List<Map<String, Object>> llamadasDeFuncion(Map<?, ?> respuesta) {
+        List<Map<String, Object>> llamadas = new ArrayList<>();
+        for (Map<String, Object> paso : pasos(respuesta)) {
+            if ("function_call".equals(paso.get("type"))) {
+                llamadas.add(paso);
+            }
+        }
+        return llamadas;
+    }
+
+    /** Los pasos de la respuesta como mapas serializables. */
+    private List<Map<String, Object>> pasos(Map<?, ?> respuesta) {
+        List<Map<String, Object>> pasos = new ArrayList<>();
+        if (respuesta.get("steps") instanceof List<?> lista) {
+            for (Object paso : lista) {
+                Map<String, Object> mapa = mapa(paso);
+                if (!mapa.isEmpty()) {
+                    pasos.add(mapa);
+                }
+            }
+        }
+        return pasos;
+    }
+
+    private Map<String, Object> resultadoDeFuncion(String nombre, Object id, Object resultado) {
+        Map<String, Object> paso = new LinkedHashMap<>();
+        paso.put("type", "function_result");
+        paso.put("name", nombre);
+        paso.put("call_id", String.valueOf(id));
+        paso.put("result", List.of(Map.of("type", "text", "text", json(resultado))));
+        return paso;
+    }
+
+    private String textoRequerido(Map<?, ?> respuesta) {
+        String texto = extraerTexto(respuesta);
+        if (texto == null || texto.isBlank()) {
+            throw new IaNoDisponibleException("Gemini devolvió una respuesta vacía.");
+        }
+        return texto.trim();
     }
 
     private String extraerTexto(Map<?, ?> respuesta) {
@@ -118,6 +244,28 @@ public class ClienteGemini implements ClienteIa {
             }
         }
         return texto.toString();
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> mapa(Object valor) {
+        return valor instanceof Map<?, ?> contenido
+                ? (Map<String, Object>) contenido
+                : Map.of();
+    }
+
+    private String json(Object valor) {
+        try {
+            return JSON.writeValueAsString(valor);
+        } catch (JacksonException error) {
+            return String.valueOf(valor);
+        }
+    }
+
+    private String mensajeDe(RuntimeException error) {
+        String mensaje = error.getMessage();
+        return mensaje == null || mensaje.isBlank()
+                ? "La herramienta falló sin detalle."
+                : mensaje;
     }
 
     @Override

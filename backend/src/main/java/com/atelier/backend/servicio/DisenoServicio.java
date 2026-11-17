@@ -73,9 +73,22 @@ public class DisenoServicio {
      * conserva su estado anterior.
      */
     public List<PropuestaDisenoResponse> generarPropuestas(Long prendaId, int cantidad) {
+        return generarPropuestas(prendaId, null, cantidad);
+    }
+
+    /**
+     * Genera propuestas con una instrucción ya redactada.
+     *
+     * <p>Lo usa el asistente: Gemini arma el brief visual y pide la imagen, de
+     * modo que la plantilla local no interviene. Con {@code instruccion} nula o
+     * vacía se comporta como el método de dos argumentos.
+     */
+    public List<PropuestaDisenoResponse> generarPropuestas(Long prendaId, String instruccion, int cantidad) {
         Prenda prenda = obtener(prendaId);
 
-        String prompt = clienteIa.construirPromptDeImagen(prenda);
+        String prompt = instruccion == null || instruccion.isBlank()
+                ? clienteIa.construirPromptDeImagen(prenda)
+                : instruccion.trim();
         prenda.setPromptIa(prompt);
         prenda.setEstado(EstadoPrenda.GENERANDO);
         prenda = prendas.save(prenda);
