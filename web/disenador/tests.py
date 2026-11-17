@@ -16,7 +16,7 @@ Usuario = get_user_model()
 MEDIA_TEMPORAL = tempfile.mkdtemp()
 
 
-@override_settings(MEDIA_ROOT=MEDIA_TEMPORAL)
+@override_settings(MEDIA_ROOT=MEDIA_TEMPORAL, AI_PROVEEDOR='demo')
 class ServicioTests(TestCase):
     def setUp(self):
         Material.objects.create(nombre='Lino', color='beige', categoria='Telas', cantidad=40)
@@ -36,10 +36,17 @@ class ServicioTests(TestCase):
         self.assertIn('simuladas', resultado['intro'])
 
     def test_obtener_proveedor_por_defecto_es_demo(self):
+        # No depende de web/.env: aquí AI_PROVEEDOR está forzado a 'demo'.
         self.assertIsInstance(obtener_proveedor(), ProveedorDemo)
 
+    @override_settings(AI_PROVEEDOR='backend')
+    def test_obtener_proveedor_backend(self):
+        from .servicios import ProveedorBackend
 
-@override_settings(MEDIA_ROOT=MEDIA_TEMPORAL)
+        self.assertIsInstance(obtener_proveedor(), ProveedorBackend)
+
+
+@override_settings(MEDIA_ROOT=MEDIA_TEMPORAL, AI_PROVEEDOR='demo')
 class AsistenteVistasTests(TestCase):
     def setUp(self):
         Material.objects.create(nombre='Lino', color='beige', categoria='Telas', cantidad=40)

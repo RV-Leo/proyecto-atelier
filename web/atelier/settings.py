@@ -177,12 +177,15 @@ MESSAGE_TAGS = {
 
 # Asistente de diseño con IA
 # --------------------------
-# 'demo':  Asistente de demostración (no genera imágenes reales).
-#          Las propuestas son simuladas y así se indican en la interfaz.
+# 'demo':    Asistente de demostración (imágenes simuladas con Pillow).
+# 'backend': Genera imágenes reales a través de la API (Spring Boot).
 # Para conectar un modelo real (p. ej. Qwen-Image) en el futuro, crear un
 # proveedor en disenador/servicios y cambiar este valor.
 AI_PROVEEDOR = os.environ.get('ATELIER_AI_PROVEEDOR', 'demo')
 AI_URL_BASE = os.environ.get('ATELIER_AI_URL_BASE', '')
+# Imágenes por envío. Pollinations (gratuito) permite una cada 45 s por IP,
+# así que por defecto se pide una sola aunque el formulario pida más.
+AI_MAX_IMAGENES = int(os.environ.get('ATELIER_AI_MAX_IMAGENES', '1'))
 
 
 # Integración con la API del backend (Spring Boot)
