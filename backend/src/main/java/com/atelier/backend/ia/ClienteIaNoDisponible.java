@@ -48,6 +48,12 @@ public class ClienteIaNoDisponible implements ClienteIa {
     }
 
     @Override
+    public String conversar(List<MensajeChat> mensajes) {
+        throw new IaNoDisponibleException(
+                "La IA no está configurada. Define IA_URL y IA_API_KEY para habilitarla.");
+    }
+
+    @Override
     public List<ImagenGenerada> generarImagenes(String prompt, int cantidad) {
         throw new IaNoDisponibleException(
                 "La IA no está configurada. Define atelier.ia.url para habilitarla.");

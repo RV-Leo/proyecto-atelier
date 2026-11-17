@@ -7,13 +7,17 @@ Las propuestas de demostración se identifican claramente en la interfaz.
 """
 
 import random
+import re
+import base64
+from urllib.parse import urlparse
+from django.db.models import Q
+from catalogo.models import Producto
 
-import requests
 from django.conf import settings
-from django.core.files.base import ContentFile
 
-from catalogo.models import Material
+from catalogo.repositories import CatalogoRepository
 from core.placeholder import generar_textura_tela
+from .ia_gateway import ClientePuenteIA, PuenteIAError, descargar_imagen_backend, solicitar_backend
 
 SUFIJOS_DESCRIPCION = [
     'con acabados limpios y silueta relajada',
@@ -45,7 +49,8 @@ class ProveedorDemo(ProveedorDiseno):
         self.esfuerzo = int(esfuerzo)
 
     def _materiales_disponibles(self, paleta):
-        materiales = list(Material.objects.filter(cantidad__gt=0))
+        catalogo = CatalogoRepository()
+        materiales = list(catalogo.materiales_disponibles())
         if not materiales:
             return [], False, False
         relacionados = []
@@ -54,7 +59,7 @@ class ProveedorDemo(ProveedorDiseno):
                 relacionados.append(m)
         stock = len(materiales)
         hay_stock_bajo = any(m.stock_bajo for m in materiales)
-        hay_agotados = Material.objects.filter(cantidad__lte=0).count() > 0
+        hay_agotados = catalogo.existen_materiales_agotados()
         return (relacionados or materiales[:3]), hay_stock_bajo, hay_agotados
 
     def generar(self, resumen, opciones):
@@ -124,98 +129,118 @@ class ProveedorQwen(ProveedorDiseno):
 
 
 class ProveedorBackend(ProveedorDiseno):
-    """Proveedor real: crea la prenda en el backend y genera imágenes con la IA.
-
-    Flujo:
-      1. POST /api/v1/prendas      → crea la prenda y devuelve su id
-      2. POST /prendas/{id}/diseno/propuestas → genera imágenes (Pollinations)
-      3. Descarga cada imagen y la devuelve como bytes para guardarla en disco.
-
-    Nunca envía la clave de Google al proveedor de imágenes: el backend ya se
-    encarga de separar texto (Gemini) de imágenes (Pollinations).
-    """
+    """Genera imágenes y guarda el resultado del backend de Atelier."""
 
     nombre = 'backend'
 
-    def __init__(self, url_base=None, usuario=None, contrasena=None, timeout=None):
-        self.url_base = (url_base or getattr(settings, 'API_BASE_URL', 'http://localhost:8080/api/v1')).rstrip('/')
-        # Las imágenes se sirven bajo /imagenes/ (fuera del prefijo /api/v1).
-        self.host_base = self.url_base[: -len('/api/v1')] if self.url_base.endswith('/api/v1') else self.url_base
-        self.usuario = usuario or getattr(settings, 'API_USER', 'atelier')
-        self.contrasena = contrasena or getattr(settings, 'API_PASSWORD', 'atelier-dev')
-        self.timeout = int(timeout or getattr(settings, 'API_TIMEOUT', 30))
-
-    def _crear_prenda(self, resumen, opciones):
-        payload = {
-            "nombre": opciones.get("nombre", resumen[:120] or "Diseño sin nombre"),
-            "tipoPrenda": opciones.get("tipo_prenda", "prenda"),
-            "estilo": opciones.get("estilo", "minimalista"),
-            "colores": opciones.get("paleta", ""),
-            "tela": "",
-            "descripcion": resumen,
-        }
-        resp = requests.post(
-            f"{self.url_base}/prendas",
-            json=payload,
-            auth=(self.usuario, self.contrasena),
-            timeout=self.timeout,
-        )
-        resp.raise_for_status()
-        return resp.json()["id"]
-
-    def _generar_propuestas(self, prenda_id, cantidad):
-        resp = requests.post(
-            f"{self.url_base}/prendas/{prenda_id}/diseno/propuestas",
-            json={"cantidad": cantidad},
-            auth=(self.usuario, self.contrasena),
-            timeout=self.timeout,
-        )
-        resp.raise_for_status()
-        return resp.json()
-
-    def _descargar_imagen(self, imagen_url):
-        resp = requests.get(
-            f"{self.host_base}{imagen_url}",
-            auth=(self.usuario, self.contrasena),
-            timeout=self.timeout,
-        )
-        resp.raise_for_status()
-        return resp.content
-
     def generar(self, resumen, opciones):
-        # Pollinations gratuito permite 1 imagen cada 45 s por IP. Pedir varias
-        # imágenes en la misma petición devuelve 402 y el backend responde 503,
-        # así que por defecto se pide una sola imagen por diseño.
-        esfuerzo = int(opciones.get("esfuerzo", 1))
-        maximo = int(getattr(settings, 'AI_MAX_IMAGENES', 1))
-        cantidad = max(1, min(esfuerzo, maximo))
-        prenda_id = self._crear_prenda(resumen, opciones)
-        datos = self._generar_propuestas(prenda_id, cantidad)
+        tipo = opciones.get('tipo_prenda', 'prenda')
+        estilo = opciones.get('estilo', 'minimalista')
+        solicitud = {
+            'nombre': resumen[:120] or f'{tipo} {estilo}',
+            'tipoPrenda': tipo,
+            'estilo': estilo,
+            'colores': opciones.get('paleta', ''),
+            'tela': opciones.get('tela', ''),
+            'descripcion': resumen,
+        }
+        prenda = solicitar_backend('/api/v1/prendas', cuerpo=solicitud)
+        prenda_id = prenda.get('id') if isinstance(prenda, dict) else None
+        if not prenda_id:
+            raise PuenteIAError('El backend no devolvió la prenda solicitada.')
+
+        imagenes = solicitar_backend(
+            f'/api/v1/prendas/{prenda_id}/diseno/propuestas',
+            cuerpo={'cantidad': 1},
+            timeout=getattr(settings, 'AI_BACKEND_IMAGE_TIMEOUT', 240),
+        )
+        if not isinstance(imagenes, list) or not imagenes:
+            raise PuenteIAError('El proveedor de IA no generó imágenes para esta idea.')
 
         propuestas = []
-        for i, item in enumerate(datos):
-            nombre_archivo = f"propuesta_{prenda_id}_{i + 1}.jpg"
-            imagen_bytes = self._descargar_imagen(item["imagenUrl"])
+        for indice, imagen in enumerate(imagenes, start=1):
+            url = imagen.get('imagenUrl') if isinstance(imagen, dict) else None
+            if not url:
+                continue
+            contenido = descargar_imagen_backend(url)
+            sufijo = re.sub(r'[^a-zA-Z0-9]+', '-', f'{tipo}-{estilo}').strip('-').lower()
+            extension = urlparse(url).path.rsplit('.', 1)[-1].lower()
+            if extension not in {'png', 'jpg', 'jpeg', 'webp'}:
+                extension = 'png'
             propuestas.append({
-                "titulo": f"Propuesta {i + 1} · {opciones.get('tipo_prenda', 'prenda').title()} {opciones.get('estilo', '').title()}",
-                "resumen": item.get("promptUsado", ""),
-                "imagen_bytes": imagen_bytes,
-                "imagen_nombre": nombre_archivo,
-                "imagen_url_backend": item["imagenUrl"],
+                'titulo': f'Propuesta {indice} · {tipo.title()} {estilo.title()}',
+                'resumen': imagen.get('promptUsado') or resumen,
+                'imagen_bytes': contenido,
+                'imagen_nombre': f'propuesta-{prenda_id}-{indice}-{sufijo}.{extension}',
+                'materiales': 'Por verificar en el inventario',
+                'viabilidad': 'Pendiente de consulta al inventario',
             })
-
+        if not propuestas:
+            raise PuenteIAError('El backend respondió, pero no devolvió imágenes utilizables.')
         return {
-            "propuestas": propuestas,
-            "intro": "Imágenes generadas por la IA del backend (Pollinations, gratuito).",
-            "demostracion": False,
+            'propuestas': propuestas,
+            'intro': 'Imágenes generadas por IA y guardadas en ATELIER.',
+            'demostracion': False,
         }
+
+    def editar(self, propuesta, instruccion):
+        if not propuesta.imagen:
+            raise PuenteIAError('No se encontró una imagen anterior para editar.')
+        propuesta.imagen.open('rb')
+        try:
+            contenido = propuesta.imagen.read()
+        finally:
+            propuesta.imagen.close()
+        encoded = base64.b64encode(contenido).decode('ascii')
+        nombre = propuesta.imagen.name.lower()
+        tipo = ('image/jpeg' if nombre.endswith(('.jpg', '.jpeg')) else
+                'image/webp' if nombre.endswith('.webp') else 'image/png')
+        bytes_imagen, ruta = ClientePuenteIA().editar_imagen(instruccion, encoded, tipo)
+        extension = ruta.rsplit('.', 1)[-1].split('?', 1)[0]
+        if extension not in {'png', 'jpg', 'jpeg', 'webp'}:
+            extension = 'png'
+        return bytes_imagen, f'edicion-{propuesta.pk}.{extension}'
 
 
 def obtener_proveedor():
     """Devuelve el proveedor configurado en settings.AI_PROVEEDOR."""
-    nombre = getattr(settings, 'AI_PROVEEDOR', 'demo')
-    if nombre == 'qwen':
-        return ProveedorQwen(getattr(settings, 'AI_URL_BASE', ''))
-    if nombre == 'backend':
+    nombre = getattr(settings, 'AI_PROVEEDOR', 'backend')
+    if nombre in {'backend', 'qwen'}:
         return ProveedorBackend()
     return ProveedorDemo()
+
+
+def contexto_catalogo(texto, request=None):
+    """Busca productos públicos del catálogo y forma contexto verificable para la IA."""
+    ignorar = {'que', 'qué', 'como', 'cómo', 'hay', 'tienen', 'tiene', 'quiero', 'ver',
+               'para', 'con', 'por', 'una', 'uno', 'los', 'las', 'del', 'de', 'un', 'en',
+               'me', 'puedes', 'puedo', 'recomiendas', 'recomendar', 'dime', 'hola', 'favor'}
+    palabras = [p for p in re.findall(r'[\wáéíóúñ]+', texto.lower())
+                if len(p) > 2 and p not in ignorar]
+    consulta = Producto.objects.all()
+    no_hubo_coincidencia = False
+    if palabras:
+        filtro = Q()
+        for palabra in palabras[:8]:
+            filtro |= Q(nombre__icontains=palabra) | Q(descripcion__icontains=palabra) | Q(
+                composicion__icontains=palabra
+            ) | Q(color__icontains=palabra) | Q(tipo__icontains=palabra)
+        productos = list(consulta.filter(filtro).distinct()[:5])
+        no_hubo_coincidencia = not productos
+    else:
+        productos = list(consulta.order_by('-es_destacado', '-actualizado')[:5])
+    if no_hubo_coincidencia:
+        return ('No se encontraron productos que coincidan con la búsqueda de la persona en el catálogo actual. '
+                'Dile con claridad que no aparece un resultado para esa consulta y pregúntale si quiere probar '
+                'con otro tipo, color o material. No sugieras nombres, precios ni stock que no estén confirmados.')
+    lineas = []
+    for p in productos:
+        disponibilidad = 'disponible' if p.disponible else 'agotado'
+        enlace = request.build_absolute_uri(p.get_absolute_url()) if request else p.get_absolute_url()
+        lineas.append(
+            f'- {p.nombre} ({p.get_tipo_display()}): S/ {p.precio}; {disponibilidad}; '
+            f'stock {p.unidades}; color {p.color or "no indicado"}; '
+            f'composición {p.composicion or "no indicada"}; {p.descripcion[:220]}; enlace {enlace}'
+        )
+    return ('Catálogo real de ATELIER (usa solo estos datos para responder sobre productos, '
+            'precios y existencias; si no aparece el artículo, dilo claramente):\n' + '\n'.join(lineas))

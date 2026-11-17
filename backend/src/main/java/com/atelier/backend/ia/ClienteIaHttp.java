@@ -7,8 +7,13 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -38,9 +43,10 @@ public class ClienteIaHttp implements ClienteIa {
     private static final Logger log = LoggerFactory.getLogger(ClienteIaHttp.class);
 
     private static final String ROL_SISTEMA =
-            "Eres el asistente de diseño textil de Atelier, una aplicación para rubro textil. "
-                    + "Respondes siempre en español, con lenguaje claro para diseñadores. "
-                    + "No inventes datos de inventario: si te dan cifras, usa exactamente esas.";
+            "Eres Atelier IA, el asistente de moda y diseño textil. Respondes siempre en español, "
+                    + "con lenguaje claro y amable. Usa los datos de catálogo recibidos en el contexto "
+                    + "solo para responder sobre esos artículos. No inventes precios ni stock; si falta "
+                    + "un dato, dilo con claridad.";
 
     private final IaProperties propiedades;
     private final RestClient rest;
@@ -84,6 +90,41 @@ public class ClienteIaHttp implements ClienteIa {
     @Override
     public boolean disponible() {
         return propiedades.habilitada();
+    }
+
+    @Override
+    public String conversar(List<MensajeChat> mensajes) {
+        return conversar(mensajes, null);
+    }
+
+    @Override
+    public String conversar(List<MensajeChat> mensajes, String contexto) {
+        if (!disponible()) {
+            throw new IaNoDisponibleException("La IA de texto no está configurada.");
+        }
+        String sistema = ROL_SISTEMA;
+        if (contexto != null && !contexto.isBlank()) {
+            sistema += "\n\n" + contexto;
+        }
+        List<Map<String, String>> historial = new ArrayList<>();
+        historial.add(Map.of("role", "system", "content", sistema));
+        mensajes.forEach(m -> historial.add(Map.of("role", m.role(), "content", m.content())));
+        Map<String, Object> cuerpo = Map.of(
+                "model", propiedades.modeloTexto(), "messages", historial, "temperature", 0.4);
+        try {
+            Map<?, ?> respuesta = rest.post().uri("/chat/completions")
+                    .contentType(MediaType.APPLICATION_JSON).body(cuerpo)
+                    .retrieve().body(Map.class);
+            if (respuesta != null && respuesta.get("choices") instanceof List<?> opciones
+                    && !opciones.isEmpty() && opciones.get(0) instanceof Map<?, ?> opcion
+                    && opcion.get("message") instanceof Map<?, ?> mensaje
+                    && mensaje.get("content") instanceof String texto && !texto.isBlank()) {
+                return texto.trim();
+            }
+            throw new IaNoDisponibleException("El proveedor de IA devolvió una respuesta vacía.");
+        } catch (RestClientException error) {
+            throw new IaNoDisponibleException("El proveedor de IA no respondió correctamente.", error);
+        }
     }
 
     @Override
@@ -206,6 +247,38 @@ public class ClienteIaHttp implements ClienteIa {
                     "El servidor de imágenes respondió pero sin imágenes utilizables");
         }
         return generadas;
+    }
+
+    @Override
+    public ImagenGenerada editarImagen(String prompt, byte[] imagen, String contentType) {
+        String tipo = contentType != null && contentType.matches("image/(jpeg|png|webp)")
+                ? contentType : "image/png";
+        ByteArrayResource archivo = new ByteArrayResource(imagen) {
+            @Override
+            public String getFilename() {
+                return tipo.endsWith("jpeg") ? "referencia.jpg"
+                        : tipo.endsWith("webp") ? "referencia.webp" : "referencia.png";
+            }
+        };
+        MultiValueMap<String, Object> datos = new LinkedMultiValueMap<>();
+        datos.add("model", propiedades.modeloImagen());
+        datos.add("prompt", prompt);
+        HttpHeaders cabeceras = new HttpHeaders();
+        cabeceras.setContentType(MediaType.parseMediaType(tipo));
+        datos.add("image", new HttpEntity<>(archivo, cabeceras));
+        try {
+            Map<?, ?> respuesta = rest.post().uri("/images/edits")
+                    .contentType(MediaType.MULTIPART_FORM_DATA).body(datos)
+                    .retrieve().body(Map.class);
+            if (respuesta == null || !(respuesta.get("data") instanceof List<?> items)
+                    || items.isEmpty() || !(items.get(0) instanceof Map<?, ?> item)
+                    || !(item.get("b64_json") instanceof String base64) || base64.isBlank()) {
+                throw new IaNoDisponibleException("El proveedor no devolvió una imagen editada utilizable.");
+            }
+            return new ImagenGenerada(guardador.guardar(base64), prompt);
+        } catch (RestClientException error) {
+            throw new IaNoDisponibleException("El proveedor de imágenes no pudo editar el diseño.", error);
+        }
     }
 
     /**

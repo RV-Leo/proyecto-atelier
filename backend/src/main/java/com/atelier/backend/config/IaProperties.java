@@ -5,8 +5,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /**
  * Configuración del puente de IA.
  *
- * <p>El README ubica al backend entre la aplicación y los modelos Qwen. Estas
- * propiedades apuntan al servidor de inferencia (o al gateway que lo rodea).
+ * <p>Estas propiedades apuntan al proveedor de texto e imágenes compatible con
+ * la API de OpenAI.
  *
  * <p>Si {@code url} está vacía, el backend funciona sin IA: los cálculos de
  * stock y viabilidad se siguen haciendo igual, solo cambia que el comentario
@@ -22,8 +22,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param url base del servidor compatible con OpenAI, p. ej.
  *        {@code http://localhost:11434/v1}. Vacía desactiva la IA.
  * @param apiKey clave si el servidor la exige; vacía si no.
- * @param modeloTexto modelo de lenguaje (README: Qwen3.6-35B-A3B).
- * @param modeloImagen modelo de imágenes (README: Qwen-Image).
+ * @param modeloTexto modelo de lenguaje configurado en el proveedor.
+ * @param modeloImagen modelo de imágenes configurado en el proveedor.
  * @param timeoutSegundos tiempo máximo de espera antes de rendirse.
  * @param directorioImagenes dónde se guardan las imágenes generadas en base64.
  * @param urlImagen base de un generador de imágenes alternativo; vacía usa el

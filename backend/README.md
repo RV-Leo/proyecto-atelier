@@ -19,7 +19,7 @@ El historial local tiene 5 commits:
 El backend cumple los dos roles que pide el README:
 
 - **API REST**: CRUD materiales, prendas, viabilidad, tendencias, diseño.
-- **Puente de IA**: hace de intermediario entre el backend y los modelos Qwen, según `docs/modelos-ia.md` pasos 4-5. La API **decide** stock/viabilidad determinísticamente; el modelo solo **narra**.
+- **Puente de IA**: conecta con Pollinations AI para el chat y la creación y edición de imágenes. La API **decide** stock y viabilidad determinísticamente; el modelo solo **narra**.
 
 #### Endpoints principales (base `/api/v1`)
 
@@ -29,6 +29,8 @@ El backend cumple los dos roles que pide el README:
 | `prendas` | GET/POST + `/materiales` | Slug nuevo (`/prendas/slug/{slug}`) |
 | `viabilidad/{prendaId}` | POST | Stock real vs. ficha técnica. `viable: false` es 200, no error |
 | `tendencias` | GET/POST + `/region/{region}` | Paginación opcional |
+| `ia/chat` | POST | Chat con contexto opcional del catálogo |
+| `ia/images/edits` | POST | Edita una imagen existente con una instrucción nueva |
 | `diseno/prompt` | GET | `fuente: MODELO` o `PLANTILLA` |
 | `diseno/propuestas` | POST|GET | 503 si la IA no está |
 | `diseno/propuestas/{id}/seleccion` | PUT | Marca la elegida |
@@ -39,6 +41,8 @@ El backend cumple los dos roles que pide el README:
 - `ConfigIa` selecciona el cliente según `propiedades.habilitada()`, no `@ConditionalOnProperty`.
 - Si `atelier.ia.url` está vacío (por defecto): IA fuera, API funciona igual con plantilla.
 - Si la URL tiene valor: se llama al modelo, se guarda el comentario y las imágenes.
+- La configuración local usa `https://gen.pollinations.ai/v1`; la clave privada se guarda solo en `application-local.properties`.
+- `IA_MODELO_TEXTO=openai/gpt-5.4-nano` responde el chat y `IA_MODELO_IMAGEN=microsoft/mai-image-2.6-flash` genera o edita imágenes.
 - `GuardadorImagenes` escribe PNG en disco bajo `atelier.ia.directorio-imagenes`, servible en `/imagenes/**` **sin autenticación** (crucial: un `<img>` no puede mandar Basic Auth).
 - `IaNoDisponibleException` → HTTP 503.
 
@@ -49,10 +53,10 @@ El backend cumple los dos roles que pide el README:
 | `POSTGRES_URL` | `jdbc:postgresql://127.0.0.1:5432/atelier` | JDBC URL. Supabase usa `sslmode=require` a mano. |
 | `POSTGRES_USER` | `atelier` | Usuario. |
 | `POSTGRES_PASSWORD` | (vacío) | Contraseña. |
-| `IA_URL` | *(vacío)* | URL base del servidor compatible con OpenAI. Vacío = IA fuera. |
-| `IA_API_KEY` | (vacío) | Bearer opcional. |
-| `IA_MODELO_TEXTO` | `Qwen3.6-35B-A3B` | Modelo para chat (prompt, comentario viabilidad). |
-| `IA_MODELO_IMAGEN` | `Qwen-Image` | Modelo para imágenes. |
+| `IA_URL` | `https://gen.pollinations.ai/v1` en la configuración local | URL base del proveedor compatible con OpenAI. |
+| `IA_API_KEY` | clave privada | Clave de Pollinations, solo en el backend. |
+| `IA_MODELO_TEXTO` | `openai/gpt-5.4-nano` | Modelo de chat y texto. |
+| `IA_MODELO_IMAGEN` | `microsoft/mai-image-2.6-flash` | Modelo para generar y editar imágenes. |
 | `IA_TIMEOUT_SEGUNDOS` | `120` | Límite de espera. `<= 0` = sin límite. |
 | `IA_DIRECTORIO_IMAGENES` | `imagenes-diseno` | Donde se guardan los PNG. |
 

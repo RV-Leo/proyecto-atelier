@@ -22,4 +22,8 @@ public interface GeneradorImagenes {
      *         imagen utilizable
      */
     List<ClienteIa.ImagenGenerada> generar(String prompt, int cantidad);
+
+    default ClienteIa.ImagenGenerada editar(String prompt, byte[] imagen, String contentType) {
+        throw new IaNoDisponibleException("El proveedor de imágenes no admite ediciones.");
+    }
 }

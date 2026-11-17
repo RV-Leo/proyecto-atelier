@@ -4,6 +4,9 @@ Si un objeto ya existe no se duplica ni se sobrescribe; las imágenes se
 generan solo la primera vez. El superusuario de desarrollo se crea si falta.
 """
 
+from pathlib import Path
+
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 
@@ -154,10 +157,14 @@ class Command(BaseCommand):
                 Producto, {'nombre': nombre}, valores, creados,
             )
             if creado and not objeto.imagen:
-                ruta = placeholder.generar_textura_tela(
-                    f'productos/{objeto.slug}', color_inicio=_color_inicio(composicion, color)
-                )
-                objeto.imagen = ruta
+                foto = Path(settings.MEDIA_ROOT) / 'productos' / f'{objeto.slug}.jpg'
+                if foto.is_file():
+                    objeto.imagen = f'productos/{objeto.slug}.jpg'
+                else:
+                    objeto.imagen = placeholder.generar_textura_tela(
+                        f'productos/{objeto.slug}',
+                        color_inicio=_color_inicio(composicion, color),
+                    )
                 objeto.save(update_fields=['imagen'])
 
     def _materiales(self, creados):
@@ -237,9 +244,14 @@ class Command(BaseCommand):
                 creados,
             )
             if creado and not objeto.imagen:
-                objeto.imagen = placeholder.generar_textura_ancha(
-                    f'tendencias/{objeto.slug}', color_inicio=(color or '#B8CBD5') or None
-                )
+                foto = Path(settings.MEDIA_ROOT) / 'tendencias' / f'{objeto.slug}.jpg'
+                if foto.is_file():
+                    objeto.imagen = f'tendencias/{objeto.slug}.jpg'
+                else:
+                    objeto.imagen = placeholder.generar_textura_ancha(
+                        f'tendencias/{objeto.slug}',
+                        color_inicio=(color or '#B8CBD5') or None,
+                    )
                 objeto.save(update_fields=['imagen'])
 
     def _colecciones(self, creados):
@@ -265,9 +277,13 @@ class Command(BaseCommand):
                 creados,
             )
             if creado:
-                objeto.imagen = placeholder.generar_textura_ancha(
-                    f'colecciones/{objeto.slug}', color_inicio=tono
-                )
+                portada = Path(settings.MEDIA_ROOT) / 'colecciones' / f'{objeto.slug}.jpg'
+                if portada.is_file():
+                    objeto.imagen = f'colecciones/{objeto.slug}.jpg'
+                else:
+                    objeto.imagen = placeholder.generar_textura_ancha(
+                        f'colecciones/{objeto.slug}', color_inicio=tono
+                    )
                 objeto.save(update_fields=['imagen'])
             for nombre_producto in productos:
                 producto = Producto.objects.filter(nombre=nombre_producto).first()

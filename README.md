@@ -35,16 +35,15 @@ Atelier es un proyecto para el **rubro textil**. Reúne herramientas para crear 
 | Base de datos | PostgreSQL + Flyway (migraciones V1–V5) | 18 |
 | Web | Django (Python) | 5.2 / 3.13 |
 | Móvil | Kotlin / Android + Retrofit | — |
-| IA de texto | Google AI Studio (Gemini) | `gemini-3.5-flash-lite` |
-| IA de imágenes | **Pollinations.ai** (HTTP, sin clave) | — |
+| IA de texto e imágenes | **Pollinations AI** (API compatible con OpenAI) | Chat `openai/gpt-5.4-nano`; imágenes `microsoft/mai-image-2.6-flash` |
 | Agentes (prototipo, rama) | FastAPI + Pydantic | 0.115 / 2.9 |
 
 ## ¿Cómo funciona?
 
 ```
 App móvil (Kotlin / Android) ──┐
-                               ├──> API REST (Spring Boot) ──┬──> IA de texto (Gemini)
-Aplicación web (Django) ───────┘                             └──> IA de imágenes (Pollinations / IA local)
+                               ├──> API REST (Spring Boot) ──> Pollinations AI
+Aplicación web (Django) ───────┘
                                                │
                                                v
                                  Base de datos PostgreSQL (atelier)
@@ -52,42 +51,28 @@ Aplicación web (Django) ───────┘                             �
 
 La web y el móvil **no se conectan a PostgreSQL**: piden todo a la API por HTTP. Ver [`docs/base-de-datos.md`](docs/base-de-datos.md).
 
-## Modelos de IA
+## IA utilizada
 
-El proyecto usa **dos proveedores distintos** para la IA y tiene un objetivo a futuro: la IA local del instituto.
-
-| Uso | Proveedor actual | Modelo | ¿Clave? | Estado |
-|---|---|---|---|---|
-| **Texto** (prompt de imagen, explicación de viabilidad) | Google AI Studio (Gemini), API compatible con OpenAI | `gemini-3.5-flash-lite` | Sí, solo en el backend | En uso |
-| **Imágenes de prendas** | **Pollinations.ai** (`GET /prompt/...`) | No hay modelo configurable | **No** | En uso |
-| **Objetivo** | WEBUI de IA local del instituto | Qwen-Image / Qwen-Image-Edit | No | Pendiente |
-| Tendencias y viabilidad (futuro) | Modelos Qwen locales | Qwen3.6-35B-A3B | No | Pendiente |
-
-**Por qué Pollinations:** Google AI Studio no incluye generación de imágenes en su Free Tier y no queremos pagar. Pollinations devuelve un JPEG real sin clave ni registro, así que sirve como solución temporal hasta conectar la IA local.
-
-**La clave de Google nunca sale del backend hacia las imágenes.** El texto y las imágenes usan clientes separados (`ClienteIaCompuesto`); el cliente de imágenes no envía la cabecera `Authorization`.
-
-En [`docs/modelos-ia.md`](docs/modelos-ia.md) está el diseño original con Qwen.
+La web usa **Pollinations AI** para las respuestas del chat y para generar y
+editar imágenes. La configuración local actual usa `openai/gpt-5.4-nano` para
+texto y `microsoft/mai-image-2.6-flash` para imágenes. La clave privada se
+configura solo en el backend.
 
 ## Generación de imágenes de diseño (implementado)
 
-La web crea la prenda en el backend y este genera la imagen con la IA. La imagen se guarda en disco y se sirve por HTTP.
+El cliente conversa desde una sola interfaz. El backend consulta el modelo de
+texto, entrega el contexto disponible y genera o edita la imagen solicitada.
 
 ```
-web: formulario (/disenador/)
+web: chat unificado (/disenador/)
+  ├── consulta de telas y prendas del catálogo
   │  POST /api/v1/prendas                                  (crea la prenda)
   │  POST /api/v1/prendas/{id}/diseno/propuestas {"cantidad":1}
+  ├── POST /api/v1/ia/chat                                  (consulta de catálogo)
+  └── POST /api/v1/ia/images/edits                          (cambio sobre imagen previa)
   ▼
 backend: DisenoServicio
-  ├── Gemini redacta el prompt de la prenda                (texto)
-  └── ClienteIaCompuesto → ClienteImagenPollinations
-        GET https://image.pollinations.ai/prompt/{prompt}?width=768&height=768
-        ▼
-      JPEG real (768×768, con marca de agua)
-        ▼
-      GuardadorImagenes → imagenes-diseno/AAAA-MM-DD/uuid.jpg
-        ▼
-      respuesta: {"imagenUrl": "/imagenes/AAAA-MM-DD/uuid.jpg"}
+  └── Pollinations AI: una imagen por pedido; los cambios usan la imagen anterior
   ▼
 web: descarga la imagen y la guarda en media/propuestas/
   ▼
@@ -99,28 +84,30 @@ se muestra en /disenador/ e /disenador/historial/
 | Archivo | Responsabilidad |
 |---|---|
 | `ia/GeneradorImagenes.java` | Contrato de un proveedor de imágenes (independiente del de texto). |
-| `ia/ClienteImagenPollinations.java` | Llama a Pollinations (`GET /prompt/...`), **sin `Authorization`**, y reintenta si hay límite. |
-| `ia/ClienteIaCompuesto.java` | Combina texto (Gemini) e imágenes (Pollinations) sin mezclar protocolos ni claves. |
+| `api/IaController.java` | Expone los endpoints de chat y edición de imágenes. |
+| `ia/ClienteIaHttp.java` | Consulta el chat y los endpoints de generación/edición del proveedor configurado. |
+| `ia/ClienteIaCompuesto.java` | Permite separar el proveedor de texto del de imágenes cuando se configura una URL distinta. |
 | `ia/GuardadorImagenes.java` | Guarda los bytes y elige la extensión por firma mágica (jpg/png/gif/webp). |
 | `ia/ConfigIa.java` | Registra el cliente compuesto y sirve `/imagenes/**` sin autenticación. |
 
-### Límites del proveedor gratuito
+### Generación y edición
 
-- **1 imagen cada 45 segundos por IP**, máximo 768×768 y con marca de agua.
-- Por eso la web pide **una imagen por envío** (`ATELIER_AI_MAX_IMAGENES` en `web/.env`, por defecto 1). Pedir 3 en el mismo segundo devolvía `503`.
-- Si se supera el límite, la web muestra un aviso claro; ya no aparece un error 500 con traceback.
-- Para sustituir Pollinations por la IA local solo hay que cambiar `IA_URL_IMAGEN` en el backend.
+- La web solicita **una imagen por pedido**.
+- El chat puede consultar prendas y telas del catálogo; si la API no ofrece un
+  dato como el precio minorista de una prenda, el asistente debe indicarlo sin
+  inventar una cifra.
+- Las ediciones envían la última imagen como referencia y guardan el resultado
+  como una versión nueva de la conversación.
 
 ### Variables de entorno del backend
 
 | Variable | Por defecto | Uso |
 |---|---|---|
-| `IA_URL` | vacío (IA de texto desactivada) | Servidor compatible con OpenAI. En local apunta a Gemini. |
-| `IA_API_KEY` | vacío | Clave del proveedor de texto. Vive en `application-local.properties` (ignorado por git). |
-| `IA_URL_IMAGEN` | vacío | Proveedor de imágenes distinto del de texto (p. ej. `https://image.pollinations.ai`). |
-| `IA_MODELO_TEXTO` | `Qwen3.6-35B-A3B` | Modelo de texto (en local, `gemini-3.5-flash-lite`). |
-| `IA_MODELO_IMAGEN` | `Qwen-Image` | Solo para proveedores OpenAI-compatibles; Pollinations no lo usa. |
-| `IA_TIMEOUT_SEGUNDOS` | `120` | Pollinations tarda ~12 s por imagen. |
+| `IA_URL` | `https://gen.pollinations.ai/v1` en configuración local | URL del proveedor compatible con OpenAI. |
+| `IA_API_KEY` | clave privada (solo backend) | Autenticación del proveedor. No se sube a Git. |
+| `IA_MODELO_TEXTO` | `openai/gpt-5.4-nano` | Modelo para el chat. |
+| `IA_MODELO_IMAGEN` | `microsoft/mai-image-2.6-flash` | Modelo para crear y editar imágenes. |
+| `IA_URL_IMAGEN` | vacío | Opcional: URL de un proveedor de imágenes separado. |
 | `IA_DIRECTORIO_IMAGENES` | `imagenes-diseno` | Carpeta donde se guardan los JPEG. |
 
 ### Dónde queda cada imagen
@@ -144,7 +131,7 @@ atelier/
 └── ai-worker/ → Prototipo de agentes asíncronos (rama feature/ai-worker)
 ```
 
-> `ai-worker/` todavía no está en `main`: es un prototipo FastAPI con agentes **simulados** (diseño, viabilidad, alertas de stock y tendencias). No habla con Gemini ni con la API de inventario. Ver su README en la rama.
+> `ai-worker/` todavía no está en `main`: es un prototipo FastAPI con agentes **simulados** (diseño, viabilidad, alertas de stock y tendencias). Aún no se conecta a proveedores externos de IA ni a la API de inventario. Ver su README en la rama.
 
 ## Empezar
 
@@ -155,57 +142,36 @@ atelier/
 2. Entra en la carpeta del módulo en el que vas a trabajar y sigue las instrucciones de su guía.
 3. Crea un archivo `.env` a partir de `.env.example`. No subas tu `.env` a GitHub.
 
-## Web: catálogo e inventario desde la API
+## Aplicación web
 
-La web ya no lee prendas ni materiales de su propia base. `web/catalogo/views.py` usa `web/catalogo/api_cliente.py`, que llama a la API del backend con HTTP Basic. Django conserva SQLite **solo para sus tablas internas** (`auth_user`, sesiones, admin).
+La interfaz web usa Django y conserva en SQLite sus datos de catálogo, inventario,
+cuentas, colecciones e historial del diseñador. Para las funciones de IA, Django
+se comunica con Spring Boot; las claves del proveedor se quedan en el backend.
 
-1. Levanta el backend en `http://localhost:8080` (ver su guía).
-2. Copia `web/.env.example` a `web/.env` y ajusta:
-
-```env
-API_BASE_URL=http://localhost:8080/api/v1
-API_USER=atelier
-API_PASSWORD=atelier-dev
-API_TIMEOUT=120
-```
-
-3. Instala dependencias y prepara las tablas internas:
+1. Copia `web/.env.example` como `web/.env`.
+2. Instala dependencias y prepara la base de datos:
 
 ```bash
-pip install -r web/requirements.txt
+cd web
+pip install -r requirements.txt
 python manage.py migrate
-python manage.py runserver
+python manage.py cargar_demo
 ```
 
-Qué consume la web:
+3. Inicia el backend y la web. La web queda disponible en `http://127.0.0.1:8000`.
 
-| Vista | Endpoint |
-|---|---|
-| Portada (`/`) | `GET /prendas?pagina=1&tamano=12` |
-| Catálogo (`/catalogo/`) | `GET /prendas?pagina=&tamano=12&q=&tipo=&estilo=` |
-| Detalle (`/catalogo/producto/<slug>/`) | `GET /prendas/slug/<slug>` |
-| Inventario (`/catalogo/inventario/`) | `GET /materiales?q=&estado=` |
-| Informes (admin) | `GET /prendas` y `GET /materiales` |
+### Chat unificado de Atelier IA
 
-Notas:
+En `/disenador/`, el cliente puede consultar prendas y telas del catálogo, pedir
+una imagen de diseño y solicitar cambios sobre la última imagen en la misma
+conversación. El chat consulta datos del catálogo, solicita **una imagen por
+pedido** y conserva cada edición como una nueva versión. Se requiere iniciar
+sesión para guardar y retomar conversaciones.
 
-- `pagina` es **base 1**; `tamano` por defecto 20 y máximo 100.
-- Django llama a la API desde el servidor, así que **no hace falta CORS**.
-- Si la API no responde, las vistas muestran un aviso y no un error 500.
-- Los campos que la API todavía no expone (precio, stock, imagen, favoritos) no se inventan: se ocultan en la interfaz.
-- Pruebas sin backend ni PostgreSQL: `python manage.py test catalogo core disenador`.
-
-### Asistente de diseño con IA real
-
-`web/disenador/` genera imágenes reales cuando `ATELIER_AI_PROVEEDOR=backend`. En ese modo `web/disenador/servicios.py` (`ProveedorBackend`) crea la prenda en la API, pide las propuestas, descarga cada imagen y la guarda en `media/propuestas/`.
-
-| Variable (en `web/.env`) | Valor | Uso |
-|---|---|---|
-| `ATELIER_AI_PROVEEDOR` | `backend` o `demo` | `backend` = IA real; `demo` = propuestas simuladas con Pillow |
-| `ATELIER_AI_MAX_IMAGENES` | `1` | Imágenes por envío (límite de Pollinations) |
-| `API_TIMEOUT` | `120` | Pollinations tarda ~12 s por imagen |
-
-Si el backend devuelve `503` (límite de Pollinations) o no responde, el asistente muestra un aviso en el formulario y conserva lo que ya habías escrito; no lanza un error 500.
+El archivo `web/.env` configura el proveedor de Django como `backend` y la URL y
+credenciales Basic del backend local. La clave de Pollinations se configura en
+`backend/src/main/resources/application-local.properties`; no se guarda en la
+web ni se sube a GitHub.
 
 ### Móvil (Kotlin) — plan futuro
 

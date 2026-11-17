@@ -53,6 +53,20 @@ public interface ClienteIa {
      */
     List<ImagenGenerada> generarImagenes(String prompt, int cantidad);
 
+    /** Conversa con mensajes validados, opcionalmente usando contexto del catálogo. */
+    default String conversar(List<MensajeChat> mensajes) {
+        throw new IaNoDisponibleException("El proveedor de texto no está disponible.");
+    }
+
+    default String conversar(List<MensajeChat> mensajes, String contexto) {
+        return conversar(mensajes);
+    }
+
+    /** Edita una imagen de referencia con una instrucción textual. */
+    default ImagenGenerada editarImagen(String prompt, byte[] imagen, String contentType) {
+        throw new IaNoDisponibleException("El proveedor de imágenes no admite ediciones.");
+    }
+
     /** Datos necesarios para que el modelo explique un veredicto. */
     record ContextoViabilidad(
             Prenda prenda,
@@ -71,5 +85,8 @@ public interface ClienteIa {
      *                    reproducirla o refinarla
      */
     record ImagenGenerada(String url, String promptUsado) {
+    }
+
+    record MensajeChat(String role, String content) {
     }
 }

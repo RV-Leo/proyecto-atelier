@@ -46,4 +46,14 @@ public class ClienteIaCompuesto implements ClienteIa {
     public List<ImagenGenerada> generarImagenes(String prompt, int cantidad) {
         return imagenes.generar(prompt, cantidad);
     }
+
+    @Override
+    public String conversar(List<MensajeChat> mensajes, String contexto) {
+        return texto.conversar(mensajes, contexto);
+    }
+
+    @Override
+    public ImagenGenerada editarImagen(String prompt, byte[] imagen, String contentType) {
+        return imagenes.editar(prompt, imagen, contentType);
+    }
 }
