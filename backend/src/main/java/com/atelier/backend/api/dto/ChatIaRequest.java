@@ -13,7 +13,12 @@ import jakarta.validation.constraints.Size;
 public record ChatIaRequest(
         @NotEmpty
         @Size(max = 20)
-        List<@Valid Mensaje> messages) {
+        List<@Valid Mensaje> messages,
+        @Size(max = 6000) String contexto) {
+
+    public ChatIaRequest(List<Mensaje> messages) {
+        this(messages, null);
+    }
 
     @AssertTrue(message = "El último mensaje debe ser del usuario")
     public boolean isLastMessageFromUser() {

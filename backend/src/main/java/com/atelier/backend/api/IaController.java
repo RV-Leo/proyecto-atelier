@@ -1,6 +1,8 @@
 package com.atelier.backend.api;
 
 import java.util.List;
+import java.util.Base64;
+import java.util.Map;
 
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -9,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.atelier.backend.api.dto.ChatIaRequest;
 import com.atelier.backend.api.dto.ChatIaResponse;
+import com.atelier.backend.api.dto.EditarImagenIaRequest;
 import com.atelier.backend.ia.ClienteIa;
 import com.atelier.backend.ia.ClienteIa.MensajeChat;
 
@@ -30,6 +33,21 @@ public class IaController {
         List<MensajeChat> mensajes = solicitud.messages().stream()
                 .map(mensaje -> new MensajeChat(mensaje.role(), mensaje.content()))
                 .toList();
-        return new ChatIaResponse(clienteIa.conversar(mensajes));
+        return new ChatIaResponse(clienteIa.conversar(mensajes, solicitud.contexto()));
+    }
+
+    @PostMapping("/images/edits")
+    public Map<String, String> editarImagen(@Valid @RequestBody EditarImagenIaRequest solicitud) {
+        byte[] imagen;
+        try {
+            imagen = Base64.getDecoder().decode(solicitud.imageBase64());
+        } catch (IllegalArgumentException error) {
+            throw new IllegalArgumentException("La imagen de referencia no es válida.", error);
+        }
+        if (imagen.length > 8_000_000) {
+            throw new IllegalArgumentException("La imagen debe pesar menos de 8 MB.");
+        }
+        var resultado = clienteIa.editarImagen(solicitud.prompt(), imagen, solicitud.contentType());
+        return Map.of("imagenUrl", resultado.url(), "promptUsado", resultado.promptUsado());
     }
 }

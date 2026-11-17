@@ -59,6 +59,12 @@ public class ClienteIaNoDisponible implements ClienteIa {
                 "La IA no está configurada. Define atelier.ia.url para habilitarla.");
     }
 
+    @Override
+    public ImagenGenerada editarImagen(String prompt, byte[] imagen, String contentType) {
+        throw new IaNoDisponibleException(
+                "La IA no está configurada para editar imágenes. Define IA_URL y IA_API_KEY.");
+    }
+
     private boolean vacio(String valor) {
         return valor == null || valor.isBlank();
     }

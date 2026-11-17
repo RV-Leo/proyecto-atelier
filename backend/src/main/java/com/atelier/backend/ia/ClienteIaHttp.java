@@ -8,7 +8,11 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.MediaType;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClient;
@@ -43,10 +47,10 @@ public class ClienteIaHttp implements ClienteIa {
                     + "claro y amable. Puedes atender consultas sobre telas y sus usos, colores, "
                     + "combinaciones, estilos, temporadas, tendencias y cuidado de prendas; también "
                     + "puedes ayudar a desarrollar ideas de diseño. Si te preguntan qué haces, explica "
-                    + "estas capacidades y sugiere ejemplos concretos. No tienes acceso en esta conversación "
-                    + "a existencias, precios ni datos privados del inventario: no los inventes y dirige "
-                    + "a la persona al módulo Inventario para comprobarlos. Si falta contexto, pregunta "
-                    + "antes de asumir.";
+                    + "estas capacidades y sugiere ejemplos concretos. Solo informa precios, disponibilidad "
+                    + "y enlaces si están incluidos en el contexto confiable del catálogo; no los inventes. "
+                    + "Si un producto no aparece en los datos recibidos, indícalo y ofrece buscar de otra forma. "
+                    + "Si falta contexto, pregunta antes de asumir.";
 
     private final IaProperties propiedades;
     private final RestClient rest;
@@ -155,11 +159,16 @@ public class ClienteIaHttp implements ClienteIa {
 
     @Override
     public String conversar(List<MensajeChat> mensajes) {
+        return conversar(mensajes, null);
+    }
+
+    @Override
+    public String conversar(List<MensajeChat> mensajes, String contexto) {
         if (!disponible()) {
             throw new IaNoDisponibleException(
                     "La IA no está configurada. Define IA_URL para habilitarla.");
         }
-        String respuesta = solicitarChat(mensajes);
+        String respuesta = solicitarChat(mensajes, contexto);
         if (respuesta == null || respuesta.isBlank()) {
             throw new IaNoDisponibleException("El proveedor de IA devolvió una respuesta vacía.");
         }
@@ -236,6 +245,51 @@ public class ClienteIaHttp implements ClienteIa {
         return generadas;
     }
 
+    @Override
+    public ImagenGenerada editarImagen(String prompt, byte[] imagen, String contentType) {
+        if (!disponible()) {
+            throw new IaNoDisponibleException("La IA no está configurada para editar imágenes.");
+        }
+        String tipo = contentType != null && contentType.matches("image/(jpeg|png|webp)")
+                ? contentType : "image/png";
+        ByteArrayResource archivo = new ByteArrayResource(imagen) {
+            @Override
+            public String getFilename() {
+                return tipo.endsWith("jpeg") ? "referencia.jpg"
+                        : tipo.endsWith("webp") ? "referencia.webp" : "referencia.png";
+            }
+        };
+        Map<?, ?> respuesta;
+        MultiValueMap<String, Object> cuerpo = new LinkedMultiValueMap<>();
+        cuerpo.add("model", propiedades.modeloImagen());
+        cuerpo.add("prompt", prompt);
+        HttpHeaders cabecerasImagen = new HttpHeaders();
+        cabecerasImagen.setContentType(MediaType.parseMediaType(tipo));
+        cuerpo.add("image", new HttpEntity<>(archivo, cabecerasImagen));
+        try {
+            respuesta = rest.post().uri("/images/edits")
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .body(cuerpo)
+                    .retrieve().body(Map.class);
+        } catch (RestClientException e) {
+            throw new IaNoDisponibleException(
+                    "El servidor de imágenes no pudo editar el diseño: " + e.getMessage(), e);
+        }
+        if (respuesta == null || !(respuesta.get("data") instanceof List<?> datos)
+                || datos.isEmpty() || !(datos.get(0) instanceof Map<?, ?> item)) {
+            throw new IaNoDisponibleException("El proveedor no devolvió una imagen editada.");
+        }
+        Object base64 = item.get("b64_json");
+        if (base64 instanceof String b && !b.isBlank()) {
+            return new ImagenGenerada(guardador.guardar(b), prompt);
+        }
+        Object url = item.get("url");
+        if (url instanceof String u && !u.isBlank()) {
+            return new ImagenGenerada(u, prompt);
+        }
+        throw new IaNoDisponibleException("El proveedor no devolvió una imagen utilizable.");
+    }
+
     /**
      * Llama al modelo de texto y devuelve su respuesta, o {@code null} si algo
      * sale mal.
@@ -258,8 +312,16 @@ public class ClienteIaHttp implements ClienteIa {
     }
 
     private String solicitarChat(List<MensajeChat> mensajes) {
+        return solicitarChat(mensajes, null);
+    }
+
+    private String solicitarChat(List<MensajeChat> mensajes, String contexto) {
         List<Map<String, String>> mensajesProveedor = new ArrayList<>();
-        mensajesProveedor.add(Map.of("role", "system", "content", ROL_SISTEMA));
+        String instrucciones = ROL_SISTEMA;
+        if (contexto != null && !contexto.isBlank()) {
+            instrucciones += "\\n\\n" + contexto;
+        }
+        mensajesProveedor.add(Map.of("role", "system", "content", instrucciones));
         mensajes.forEach(mensaje -> mensajesProveedor.add(
                 Map.of("role", mensaje.role(), "content", mensaje.content())));
 

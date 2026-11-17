@@ -51,6 +51,11 @@ public interface ClienteIa {
      */
     String conversar(List<MensajeChat> mensajes);
 
+    /** Conversa con datos verificados del catálogo proporcionados por la web. */
+    default String conversar(List<MensajeChat> mensajes, String contexto) {
+        return conversar(mensajes);
+    }
+
     /**
      * Genera imágenes de la prenda (paso 3 del flujo, Qwen-Image).
      *
@@ -59,6 +64,11 @@ public interface ClienteIa {
      * @return una por imagen generada
      */
     List<ImagenGenerada> generarImagenes(String prompt, int cantidad);
+
+    /** Edita una imagen anterior según la instrucción de texto. */
+    default ImagenGenerada editarImagen(String prompt, byte[] imagen, String contentType) {
+        throw new IaNoDisponibleException("El proveedor de imágenes no admite edición.");
+    }
 
     /** Datos necesarios para que el modelo explique un veredicto. */
     record ContextoViabilidad(
