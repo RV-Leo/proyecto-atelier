@@ -63,6 +63,24 @@ La aplicación web separa modelos, repositorios, servicios y vistas. Consulta
 [`docs/arquitectura-web.md`](docs/arquitectura-web.md) para ver las capas y sus
 responsabilidades.
 
+## Diseñador IA en la web
+
+El diseñador reúne en una sola conversación las consultas del catálogo y la
+creación de diseños. Las personas pueden:
+
+- Preguntar por prendas y telas publicadas en ATELIER. La web busca coincidencias
+  y proporciona al asistente datos del catálogo, como precio, stock, color,
+  composición y enlace del producto.
+- Describir una prenda para generar una imagen. Se solicita una imagen por pedido.
+- Pedir cambios sobre la última imagen. El backend envía la imagen anterior como
+  referencia al endpoint de edición del proveedor configurado; cada resultado se
+  guarda como una nueva versión en la conversación.
+
+El chat y el historial requieren iniciar sesión. Los diseños generados se pueden
+guardar como favoritos y consultar desde **Mis diseños**. La integración usa el
+puente de IA de Spring Boot; el proveedor y el modelo se configuran en el servidor,
+sin exponer credenciales en la web.
+
 ## Empezar
 
 1. Clona el repositorio:
