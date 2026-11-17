@@ -17,23 +17,7 @@ import org.springframework.web.client.RestClientException;
 import com.atelier.backend.config.IaProperties;
 import com.atelier.backend.dominio.Prenda;
 
-/**
- * Puente real hacia un servidor de inferencia compatible con OpenAI.
- *
- * <p>Casi todos los servidores locales que ejecutan modelos Qwen (vLLM, Ollama,
- * LM Studio, TGI) exponen esta misma API. Por eso el backend no depende de un
- * proveedor concreto: cambiando la URL sirve para cualquiera, o para el
- * gateway de Django si el equipo decide que ese sea el intermediario.
- *
- * <p>Las respuestas del modelo son texto libre y poco confiable en su formato,
- * así que este componente nunca es la fuente de verdad de los datos: Spring
- * Boot calcula el stock y la viabilidad, y el modelo solo redacta. Si el modelo
- * falla, se propaga {@link IaNoDisponibleException} y el servicio correspondiente
- * usa su vía determinista.
- *
- * <p>No lleva {@code @Component}: lo registra {@link ConfigIa} según haya URL
- * de servidor o no.
- */
+/** Cliente para proveedores de IA con API compatible con OpenAI. */
 public class ClienteIaHttp implements ClienteIa {
 
     private static final Logger log = LoggerFactory.getLogger(ClienteIaHttp.class);
@@ -49,19 +33,11 @@ public class ClienteIaHttp implements ClienteIa {
     private final RestClient rest;
     private final GuardadorImagenes guardador;
 
-    /**
-     * @param builder inyectado en lugar de creado aquí, para que las pruebas
-     *                puedan sustituir el transporte con {@code MockRestServiceServer}
-     *                y ejercitar este cliente sin levantar un servidor de modelos.
-     */
     public ClienteIaHttp(IaProperties propiedades, GuardadorImagenes guardador, RestClient.Builder builder) {
         this.propiedades = propiedades;
         this.guardador = guardador;
 
-        // Sin tiempo de espera, un servidor de modelos colgado dejaría un hilo
-        // de Tomcat bloqueado para siempre. Generar imágenes es lento, por eso
-        // el límite es configurable y no un valor fijo. Un valor <= 0 no impone
-        // límite, lo que además deja el transporte libre para las pruebas.
+        // El timeout configurable evita que una solicitud bloquee el servidor indefinidamente.
         RestClient.Builder configurado = builder
                 .baseUrl(propiedades.url())
                 .defaultHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE);
@@ -218,14 +194,7 @@ public class ClienteIaHttp implements ClienteIa {
         return generadas;
     }
 
-    /**
-     * Llama al modelo de texto y devuelve su respuesta, o {@code null} si algo
-     * sale mal.
-     *
-     * <p>Devolver {@code null} en vez de lanzar es deliberado: aquí el modelo es
-     * un adorno, no una dependencia. Un fallo al redactar un comentario no debe
-     * tirar abajo un cálculo de stock que ya salió bien.
-     */
+    /** Devuelve {@code null} ante fallos no críticos de redacción. */
     private String chat(List<MensajeChat> mensajes) {
         if (!disponible()) {
             return null;
