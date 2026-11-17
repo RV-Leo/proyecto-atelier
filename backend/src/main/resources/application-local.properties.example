@@ -14,5 +14,5 @@ spring.security.user.password=atelier-dev
 atelier.ia.url=https://gen.pollinations.ai/v1
 atelier.ia.api-key=PEGA_AQUI_TU_CLAVE_PRIVADA
 atelier.ia.modelo-texto=openai/gpt-5.4-nano
-atelier.ia.modelo-imagen=qwen/qwen-image-2.1
+atelier.ia.modelo-imagen=microsoft/mai-image-2.6-flash
 atelier.ia.timeout-segundos=240

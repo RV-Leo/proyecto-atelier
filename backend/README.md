@@ -9,7 +9,7 @@
 El backend cumple los dos roles que pide el README:
 
 - **API REST**: CRUD materiales, prendas, viabilidad, tendencias, diseño.
-- **Puente de IA**: hace de intermediario entre el backend y los modelos Qwen, según `docs/modelos-ia.md` pasos 4-5. La API **decide** stock/viabilidad determinísticamente; el modelo solo **narra**.
+- **Puente de IA**: conecta con Pollinations AI para el chat y la generación/edición de imágenes. La API **decide** stock y viabilidad determinísticamente; el modelo solo **narra**.
 
 #### Endpoints principales (base `/api/v1`)
 
@@ -20,6 +20,7 @@ El backend cumple los dos roles que pide el README:
 | `viabilidad/{prendaId}` | POST | Stock real vs. ficha técnica. `viable: false` es 200, no error |
 | `tendencias` | GET/POST + `/region/{region}` | Paginación opcional |
 | `ia/chat` | POST | Chat de texto compartido por la web y la app móvil |
+| `ia/images/edits` | POST | Edita una imagen anterior con una instrucción nueva |
 | `diseno/prompt` | GET | `fuente: MODELO` o `PLANTILLA` |
 | `diseno/propuestas` | POST|GET | 503 si la IA no está |
 | `diseno/propuestas/{id}/seleccion` | PUT | Marca la elegida |
@@ -31,8 +32,7 @@ El backend cumple los dos roles que pide el README:
 - Si `atelier.ia.url` está vacío (por defecto): IA fuera, API funciona igual con plantilla.
 - Si la URL tiene valor: se llama al modelo, se guarda el comentario y las imágenes.
 - `POST /api/v1/ia/chat` acepta hasta 20 mensajes de usuario/asistente; no acepta instrucciones de sistema enviadas por clientes.
-- Para usar Gemini temporalmente, configura la URL compatible con OpenAI `https://generativelanguage.googleapis.com/v1beta/openai/`, `IA_API_KEY` y `IA_MODELO_TEXTO=gemini-3.8-flash`. La clave solo vive en el backend.
-- Para cambiar a Qwen, apunta `IA_URL` al servidor compatible y cambia `IA_MODELO_TEXTO`; los contratos de web y móvil no cambian.
+- Para Pollinations, configura `IA_URL=https://gen.pollinations.ai/v1`, una clave privada en `IA_API_KEY` y los modelos indicados abajo. La clave solo vive en el backend.
 - `GuardadorImagenes` escribe PNG en disco bajo `atelier.ia.directorio-imagenes`, servible en `/imagenes/**` **sin autenticación** (crucial: un `<img>` no puede mandar Basic Auth).
 - `IaNoDisponibleException` → HTTP 503.
 
@@ -43,10 +43,10 @@ El backend cumple los dos roles que pide el README:
 | `POSTGRES_URL` | `jdbc:postgresql://127.0.0.1:5432/atelier` | JDBC URL. Supabase usa `sslmode=require` a mano. |
 | `POSTGRES_USER` | `atelier` | Usuario. |
 | `POSTGRES_PASSWORD` | (vacío) | Contraseña. |
-| `IA_URL` | *(vacío)* | URL base del servidor compatible con OpenAI. Vacío = IA fuera. |
-| `IA_API_KEY` | (vacío) | Bearer opcional. |
-| `IA_MODELO_TEXTO` | `gemini-3.8-flash` | Modelo para chat (prompt, comentario viabilidad). |
-| `IA_MODELO_IMAGEN` | `Qwen-Image` | Modelo para imágenes. |
+| `IA_URL` | `https://gen.pollinations.ai/v1` | URL de Pollinations AI. |
+| `IA_API_KEY` | (privada) | Clave de Pollinations configurada solo en el backend. |
+| `IA_MODELO_TEXTO` | `openai/gpt-5.4-nano` | Modelo para chat y texto. |
+| `IA_MODELO_IMAGEN` | `microsoft/mai-image-2.6-flash` | Modelo para generación y edición de imágenes. |
 | `IA_TIMEOUT_SEGUNDOS` | `120` | Límite de espera. `<= 0` = sin límite. |
 | `IA_DIRECTORIO_IMAGENES` | `imagenes-diseno` | Donde se guardan los PNG. |
 
@@ -80,7 +80,7 @@ La rama de origen contiene pruebas de integración para estos módulos. No se in
 3. Copia `src/main/resources/application-local.properties.example` como `application-local.properties`, reemplaza `PEGA_AQUI_TU_CLAVE_PRIVADA` y deja la base H2 local para desarrollo.
 4. Desde `backend`, ejecuta `mvnw.cmd spring-boot:run`. El backend queda en `http://localhost:8080`; la web ya apunta a esa dirección con las credenciales locales `atelier` / `atelier-dev`.
 
-La configuración local usa `openai/gpt-5.4-nano` para el chat y `tongyi-mai/z-image-turbo` para generar imágenes con Quest Pollen. Puedes cambiar los modelos desde `application-local.properties` si tu cuenta no tiene acceso a ellos.
+La configuración local usa `openai/gpt-5.4-nano` para el chat y `microsoft/mai-image-2.6-flash` para generar y editar imágenes con Pollinations AI. Puedes cambiar los modelos desde `application-local.properties` si tu cuenta no tiene acceso a ellos.
 
 El diseñador solicita una imagen por envío. La API de Pollinations valida que el campo `n` de cada solicitud de generación sea como máximo `1`; el backend repite solicitudes individuales únicamente cuando otro consumidor pide varias variantes.
 

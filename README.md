@@ -29,25 +29,26 @@ Atelier es un proyecto para el **rubro textil**. Reúne herramientas para crear 
 
 ```
 App móvil (Kotlin / Android) ──┐
-                               ├──> API REST (Spring Boot) ──> Gateway IA (Django) ──> Modelos Qwen
-Aplicación web (Django) ───────┘                │                 
+                               ├──> API REST (Spring Boot) ──> Pollinations AI
+Aplicación web (Django) ───────┘                │
                                                 v
                                   Base de datos (PostgreSQL propuesto)
 ```
 
 PostgreSQL es una propuesta para la base de datos; todavía no hay un motor configurado en el repositorio.
 
-## Modelos de IA
+## IA utilizada actualmente
 
-Para las funciones de IA elegimos modelos de la familia **Qwen**. Se ejecutan en un servidor local y nos ayudan a crear diseños, revisar tendencias y comprobar si hay materiales para producir una prenda.
+El backend se conecta a **Pollinations AI** mediante su API compatible con OpenAI.
+La clave se configura únicamente en el servidor.
 
-| Módulo | Modelo | Uso |
+| Función | Modelo configurado | Uso |
 |---|---|---|
-| Diseño generativo | Qwen-Image / Qwen-Image-Edit | Crear y editar imágenes de prendas |
-| Tendencias | Qwen3.6-35B-A3B | Identificar colores, cortes y telas en imágenes |
-| Viabilidad e inventario | Qwen3.6-35B-A3B | Comparar una idea con el stock y sugerir alternativas |
+| Chat | `openai/gpt-5.4-nano` | Responder consultas y conversar sobre el catálogo de ATELIER. |
+| Imágenes | `microsoft/mai-image-2.6-flash` | Crear una imagen por pedido y editar el último diseño usando la imagen anterior como referencia. |
 
-En [`docs/modelos-ia.md`](docs/modelos-ia.md) contamos por qué elegimos estos modelos y qué papel cumplen en el proyecto.
+Estos son los modelos de la configuración local actual. Se pueden cambiar desde
+`application-local.properties` si la clave o la cuenta no tiene acceso a ellos.
 
 ## Estructura del proyecto
 
