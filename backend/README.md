@@ -19,7 +19,7 @@ El historial local tiene 5 commits:
 El backend cumple los dos roles que pide el README:
 
 - **API REST**: CRUD materiales, prendas, viabilidad, tendencias, diseño.
-- **Puente de IA**: conecta con Pollinations AI para el chat y la creación y edición de imágenes. La API **decide** stock y viabilidad determinísticamente; el modelo solo **narra**.
+- **Puente de IA**: usa Gemini para conversaciones y Pollinations para crear y editar imágenes. La API **decide** stock y viabilidad determinísticamente; Gemini solo **narra**.
 
 #### Endpoints principales (base `/api/v1`)
 
@@ -37,12 +37,11 @@ El backend cumple los dos roles que pide el README:
 
 #### Puente de IA (detalle)
 
-- `ClienteIa` (interfaz) → `ClienteIaHttp` (cliente HTTP) o `ClienteIaNoDisponible` (fallback).
-- `ConfigIa` selecciona el cliente según `propiedades.habilitada()`, no `@ConditionalOnProperty`.
-- Si `atelier.ia.url` está vacío (por defecto): IA fuera, API funciona igual con plantilla.
-- Si la URL tiene valor: se llama al modelo, se guarda el comentario y las imágenes.
-- La configuración local usa `https://gen.pollinations.ai/v1`; la clave privada se guarda solo en `application-local.properties`.
-- `IA_MODELO_TEXTO=openai/gpt-5.4-nano` responde el chat y `IA_MODELO_IMAGEN=microsoft/mai-image-2.6-flash` genera o edita imágenes.
+- `ClienteIa` → `ClienteGemini` para texto y `ClienteImagenPollinations` para imágenes; `ClienteIaCompuesto` separa ambas rutas.
+- `ClienteGemini` usa Gemini Interactions y su propia clave `GEMINI_API_KEY`.
+- `ClienteImagenPollinations` usa `POST /v1/images/generations` y `POST /v1/images/edits` con `POLLINATIONS_API_KEY`.
+- Las credenciales de Gemini y Pollinations nunca se envían al proveedor contrario. Las claves locales se mantienen en `application-local.properties`.
+- `GEMINI_MODELO_TEXTO=gemini-3.8-flash` responde el chat y `POLLINATIONS_MODELO_IMAGEN=microsoft/mai-image-2.6-flash` crea o edita imágenes.
 - `GuardadorImagenes` escribe PNG en disco bajo `atelier.ia.directorio-imagenes`, servible en `/imagenes/**` **sin autenticación** (crucial: un `<img>` no puede mandar Basic Auth).
 - `IaNoDisponibleException` → HTTP 503.
 
@@ -53,10 +52,12 @@ El backend cumple los dos roles que pide el README:
 | `POSTGRES_URL` | `jdbc:postgresql://127.0.0.1:5432/atelier` | JDBC URL. Supabase usa `sslmode=require` a mano. |
 | `POSTGRES_USER` | `atelier` | Usuario. |
 | `POSTGRES_PASSWORD` | (vacío) | Contraseña. |
-| `IA_URL` | `https://gen.pollinations.ai/v1` en la configuración local | URL base del proveedor compatible con OpenAI. |
-| `IA_API_KEY` | clave privada | Clave de Pollinations, solo en el backend. |
-| `IA_MODELO_TEXTO` | `openai/gpt-5.4-nano` | Modelo de chat y texto. |
-| `IA_MODELO_IMAGEN` | `microsoft/mai-image-2.6-flash` | Modelo para generar y editar imágenes. |
+| `GEMINI_URL` | `https://generativelanguage.googleapis.com/v1beta` | URL de Gemini Interactions. |
+| `GEMINI_API_KEY` | clave privada | Clave Gemini, solo en el backend. |
+| `GEMINI_MODELO_TEXTO` | `gemini-3.8-flash` | Modelo para conversaciones. |
+| `POLLINATIONS_URL` | `https://gen.pollinations.ai/v1` | URL API de imágenes. |
+| `POLLINATIONS_API_KEY` | clave privada | Clave Pollinations, solo en el backend. |
+| `POLLINATIONS_MODELO_IMAGEN` | `microsoft/mai-image-2.6-flash` | Modelo para generar y editar imágenes. |
 | `IA_TIMEOUT_SEGUNDOS` | `120` | Límite de espera. `<= 0` = sin límite. |
 | `IA_DIRECTORIO_IMAGENES` | `imagenes-diseno` | Donde se guardan los PNG. |
 

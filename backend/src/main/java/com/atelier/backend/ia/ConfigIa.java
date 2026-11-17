@@ -17,13 +17,9 @@ import com.atelier.backend.config.IaProperties;
  * <p>Elige el cliente según haya o no un servidor de modelos configurado:
  *
  * <ul>
- *   <li>Con {@code atelier.ia.url}, usa {@link ClienteIaHttp}, que habla con un
- *       servidor compatible con OpenAI (vLLM, Ollama, LM Studio...).</li>
- *   <li>Con {@code atelier.ia.url-imagen} además, las imágenes se piden a ese
- *       proveedor a través de {@link ClienteImagenPollinations}, que usa un
- *       protocolo propio. Así el texto puede venir de un modelo y las fotos de
- *       otro, que es lo que permite usar la vía gratuita de Pollinations sin
- *       dejar de aprovechar el servidor de texto ya configurado.</li>
+ *   <li>Gemini gestiona las conversaciones mediante su API Interactions.</li>
+ *   <li>Pollinations recibe por separado las solicitudes de generación y edición
+ *       de imágenes, junto con su propia clave.</li>
  *   <li>Sin esas propiedades, usa {@link ClienteIaNoDisponible}: la API sigue
  *       funcionando y la viabilidad se calcula igual, solo que sin texto
  *       redactado por el modelo.</li>
@@ -58,27 +54,22 @@ public class ConfigIa implements WebMvcConfigurer {
     /**
      * Fábrica del puente de IA.
      *
-     * <p>La fórmula es: texto de donde haya, imágenes de donde haya, y si no
-     * hay nada, la vía determinista. Con {@code url-imagen} definida se compone
-     * un cliente por fuente, de modo que el generador de fotos gratuito no
-     * recibe la cabecera Authorization del proveedor de texto.
+     * <p>Cada proveedor se instancia solo si cuenta con URL y credenciales. Las
+     * claves nunca se comparten entre Gemini y Pollinations.
      */
     @Bean
     ClienteIa clienteIa(GuardadorImagenes guardador, RestClient.Builder builder) {
-        if (!propiedades.habilitada()) {
-            return new ClienteIaNoDisponible();
+        ClienteIa texto = propiedades.habilitada() && propiedades.apiKey() != null
+                && !propiedades.apiKey().isBlank()
+                        ? new ClienteGemini(propiedades, builder)
+                        : new ClienteIaNoDisponible();
+        if (propiedades.imagenExterna() && propiedades.apiKeyImagen() != null
+                && !propiedades.apiKeyImagen().isBlank()) {
+            GeneradorImagenes imagenes = new ClienteImagenPollinations(
+                    propiedades, guardador, RestClient.builder());
+            return new ClienteIaCompuesto(texto, imagenes);
         }
-
-        ClienteIa texto = new ClienteIaHttp(propiedades, guardador, builder);
-        if (!propiedades.imagenExterna()) {
-            // Sin proveedor de imágenes propio, el mismo cliente hace las dos
-            // cosas y se comporta exactamente como hasta ahora.
-            return texto;
-        }
-
-        GeneradorImagenes imagenes =
-                new ClienteImagenPollinations(propiedades, guardador, RestClient.builder());
-        return new ClienteIaCompuesto(texto, imagenes);
+        return texto;
     }
 
     /**

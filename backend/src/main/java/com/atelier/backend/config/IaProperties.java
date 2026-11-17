@@ -5,8 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /**
  * Configuración del puente de IA.
  *
- * <p>Estas propiedades apuntan al proveedor de texto e imágenes compatible con
- * la API de OpenAI.
+ * <p>Los proveedores de texto e imagen tienen URL y claves independientes.
  *
  * <p>Si {@code url} está vacía, el backend funciona sin IA: los cálculos de
  * stock y viabilidad se siguen haciendo igual, solo cambia que el comentario
@@ -19,15 +18,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * {@code GET /prompt/...} que devuelve los bytes de la foto, así que necesita su
  * propio cliente. Vacía, las imágenes siguen saliendo del servidor de {@code url}.
  *
- * @param url base del servidor compatible con OpenAI, p. ej.
- *        {@code http://localhost:11434/v1}. Vacía desactiva la IA.
- * @param apiKey clave si el servidor la exige; vacía si no.
+ * @param url base de Gemini, normalmente {@code https://generativelanguage.googleapis.com/v1beta}.
+ * @param apiKey clave privada de Gemini.
  * @param modeloTexto modelo de lenguaje configurado en el proveedor.
- * @param modeloImagen modelo de imágenes configurado en el proveedor.
+ * @param modeloImagen modelo de imágenes configurado en Pollinations.
  * @param timeoutSegundos tiempo máximo de espera antes de rendirse.
  * @param directorioImagenes dónde se guardan las imágenes generadas en base64.
- * @param urlImagen base de un generador de imágenes alternativo; vacía usa el
- *        de {@code url}.
+ * @param urlImagen base de la API de imágenes de Pollinations.
+ * @param apiKeyImagen clave privada de Pollinations, separada de la de Gemini.
  */
 @ConfigurationProperties(prefix = "atelier.ia")
 public record IaProperties(
@@ -37,9 +35,22 @@ public record IaProperties(
         String modeloImagen,
         int timeoutSegundos,
         String directorioImagenes,
-        String urlImagen) {
+        String urlImagen,
+        String apiKeyImagen) {
 
-    /** La IA solo se usa si hay un servidor al que preguntarle. */
+    /** Compatibilidad con las configuraciones anteriores del backend. */
+    public IaProperties(
+            String url,
+            String apiKey,
+            String modeloTexto,
+            String modeloImagen,
+            int timeoutSegundos,
+            String directorioImagenes,
+            String urlImagen) {
+        this(url, apiKey, modeloTexto, modeloImagen, timeoutSegundos, directorioImagenes, urlImagen, "");
+    }
+
+    /** El cliente de texto solo se usa si Gemini está configurado. */
     public boolean habilitada() {
         return url != null && !url.isBlank();
     }

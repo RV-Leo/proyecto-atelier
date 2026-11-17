@@ -10,6 +10,7 @@
 ![Django](https://img.shields.io/badge/Django-092E20?style=for-the-badge&logo=django&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
+![Google Gemini](https://img.shields.io/badge/Gemini-Texto-4285F4?style=for-the-badge&logo=google)
 ![Pollinations.ai](https://img.shields.io/badge/Pollinations.ai-Im%C3%A1genes-FF6F61?style=for-the-badge)
 ![IA](https://img.shields.io/badge/IA-Generativa-FF6F61?style=for-the-badge)
 
@@ -35,15 +36,17 @@ Atelier es un proyecto para el **rubro textil**. Reúne herramientas para crear 
 | Base de datos | PostgreSQL + Flyway (migraciones V1–V5) | 18 |
 | Web | Django (Python) | 5.2 / 3.13 |
 | Móvil | Kotlin / Android + Retrofit | — |
-| IA de texto e imágenes | **Pollinations AI** (API compatible con OpenAI) | Chat `openai/gpt-5.4-nano`; imágenes `microsoft/mai-image-2.6-flash` |
+| IA conversacional | **Google Gemini Interactions API** | `gemini-3.8-flash` |
+| Generación y edición de imágenes | **Pollinations AI** | `microsoft/mai-image-2.6-flash` |
 | Agentes (prototipo, rama) | FastAPI + Pydantic | 0.115 / 2.9 |
 
 ## ¿Cómo funciona?
 
 ```
 App móvil (Kotlin / Android) ──┐
-                               ├──> API REST (Spring Boot) ──> Pollinations AI
+                               ├──> API REST (Spring Boot) ──┬──> Gemini (chat/texto)
 Aplicación web (Django) ───────┘
+                                                              └──> Pollinations (imágenes)
                                                │
                                                v
                                  Base de datos PostgreSQL (atelier)
@@ -53,10 +56,11 @@ La web y el móvil **no se conectan a PostgreSQL**: piden todo a la API por HTTP
 
 ## IA utilizada
 
-La web usa **Pollinations AI** para las respuestas del chat y para generar y
-editar imágenes. La configuración local actual usa `openai/gpt-5.4-nano` para
-texto y `microsoft/mai-image-2.6-flash` para imágenes. La clave privada se
-configura solo en el backend.
+El chat y las consultas de catálogo usan **Gemini**. La creación y edición de
+imágenes se envía aparte a **Pollinations**, con su propia clave. Así las
+solicitudes de imagen no consumen el uso de Gemini; el chat sí utiliza el plan o
+la cuota de Gemini que tenga configurada la cuenta. Las dos claves se guardan
+solo en el backend.
 
 ## Generación de imágenes de diseño (implementado)
 
@@ -72,7 +76,8 @@ web: chat unificado (/disenador/)
   └── POST /api/v1/ia/images/edits                          (cambio sobre imagen previa)
   ▼
 backend: DisenoServicio
-  └── Pollinations AI: una imagen por pedido; los cambios usan la imagen anterior
+  ├── Gemini: conversación y contexto del catálogo
+  └── Pollinations: una imagen por pedido; los cambios usan la imagen anterior
   ▼
 web: descarga la imagen y la guarda en media/propuestas/
   ▼
@@ -85,8 +90,9 @@ se muestra en /disenador/ e /disenador/historial/
 |---|---|
 | `ia/GeneradorImagenes.java` | Contrato de un proveedor de imágenes (independiente del de texto). |
 | `api/IaController.java` | Expone los endpoints de chat y edición de imágenes. |
-| `ia/ClienteIaHttp.java` | Consulta el chat y los endpoints de generación/edición del proveedor configurado. |
-| `ia/ClienteIaCompuesto.java` | Permite separar el proveedor de texto del de imágenes cuando se configura una URL distinta. |
+| `ia/ClienteGemini.java` | Envía conversaciones e historial a la API Interactions de Gemini. |
+| `ia/ClienteImagenPollinations.java` | Genera y edita imágenes con la API de Pollinations. |
+| `ia/ClienteIaCompuesto.java` | Enruta texto a Gemini e imágenes a Pollinations. |
 | `ia/GuardadorImagenes.java` | Guarda los bytes y elige la extensión por firma mágica (jpg/png/gif/webp). |
 | `ia/ConfigIa.java` | Registra el cliente compuesto y sirve `/imagenes/**` sin autenticación. |
 
@@ -103,11 +109,12 @@ se muestra en /disenador/ e /disenador/historial/
 
 | Variable | Por defecto | Uso |
 |---|---|---|
-| `IA_URL` | `https://gen.pollinations.ai/v1` en configuración local | URL del proveedor compatible con OpenAI. |
-| `IA_API_KEY` | clave privada (solo backend) | Autenticación del proveedor. No se sube a Git. |
-| `IA_MODELO_TEXTO` | `openai/gpt-5.4-nano` | Modelo para el chat. |
-| `IA_MODELO_IMAGEN` | `microsoft/mai-image-2.6-flash` | Modelo para crear y editar imágenes. |
-| `IA_URL_IMAGEN` | vacío | Opcional: URL de un proveedor de imágenes separado. |
+| `GEMINI_URL` | `https://generativelanguage.googleapis.com/v1beta` en configuración local | API de texto Gemini. |
+| `GEMINI_API_KEY` | clave privada (solo backend) | Autenticación de Gemini. No se sube a Git. |
+| `GEMINI_MODELO_TEXTO` | `gemini-3.8-flash` | Modelo para el chat y las consultas. |
+| `POLLINATIONS_URL` | `https://gen.pollinations.ai/v1` | API de imágenes Pollinations. |
+| `POLLINATIONS_API_KEY` | clave privada (solo backend) | Autenticación de Pollinations, separada de Gemini. |
+| `POLLINATIONS_MODELO_IMAGEN` | `microsoft/mai-image-2.6-flash` | Modelo para crear y editar imágenes. |
 | `IA_DIRECTORIO_IMAGENES` | `imagenes-diseno` | Carpeta donde se guardan los JPEG. |
 
 ### Dónde queda cada imagen
@@ -169,9 +176,9 @@ pedido** y conserva cada edición como una nueva versión. Se requiere iniciar
 sesión para guardar y retomar conversaciones.
 
 El archivo `web/.env` configura el proveedor de Django como `backend` y la URL y
-credenciales Basic del backend local. La clave de Pollinations se configura en
-`backend/src/main/resources/application-local.properties`; no se guarda en la
-web ni se sube a GitHub.
+credenciales Basic del backend local. Las claves de Gemini y Pollinations se
+configuran por separado en `backend/src/main/resources/application-local.properties`;
+no se guardan en la web ni se suben a GitHub.
 
 ### Móvil (Kotlin) — plan futuro
 

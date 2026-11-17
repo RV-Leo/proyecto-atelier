@@ -50,7 +50,7 @@ public class ClienteIaNoDisponible implements ClienteIa {
     @Override
     public String conversar(List<MensajeChat> mensajes) {
         throw new IaNoDisponibleException(
-                "La IA no está configurada. Define IA_URL y IA_API_KEY para habilitarla.");
+                "Gemini no está configurado. Define GEMINI_URL y GEMINI_API_KEY para habilitar el chat.");
     }
 
     @Override
