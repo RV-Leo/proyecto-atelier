@@ -1,6 +1,7 @@
 """Acceso a datos de conversaciones y propuestas de diseño."""
 
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 
 from .models import Conversacion, Mensaje, PropuestaDiseno
 
@@ -19,7 +20,10 @@ class DisenadorRepository:
         return Conversacion.objects.create(usuario=usuario, titulo=titulo)
 
     def crear_mensaje(self, conversacion, rol, texto):
-        return Mensaje.objects.create(conversacion=conversacion, rol=rol, texto=texto)
+        mensaje = Mensaje.objects.create(conversacion=conversacion, rol=rol, texto=texto)
+        conversacion.actualizada = timezone.now()
+        conversacion.save(update_fields=['actualizada'])
+        return mensaje
 
     def mensajes_recientes(self, conversacion, limite=19):
         mensajes = list(conversacion.mensajes.order_by('-creada')[:limite])

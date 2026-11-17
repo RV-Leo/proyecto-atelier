@@ -6,7 +6,6 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from .forms import DisenoForm
 from .ia_gateway import PuenteIAError
 from .services import DisenoService
 
@@ -14,50 +13,18 @@ servicio_diseno = DisenoService()
 
 
 def asistente(request):
-    """Recibe la solicitud del usuario y presenta el resultado del asistente."""
-    formulario = DisenoForm()
-    propuestas_demo = None
+    """Presenta una conversación unificada de consulta y diseño."""
     conv_id = request.GET.get('c')
-    if not (conv_id and request.user.is_authenticated) and request.session.get('propuestas_demo'):
-        propuestas_demo = request.session.pop('propuestas_demo', [])
-    conversacion, propuestas = servicio_diseno.estado_asistente(
-        request.user, conv_id, propuestas_demo
-    )
-
-    if request.method == 'POST':
-        formulario = DisenoForm(request.POST)
-        if formulario.is_valid():
-            datos = dict(formulario.cleaned_data)
-            resumen = datos.pop('descripcion')
-            try:
-                generado = servicio_diseno.generar(request.user, resumen, datos)
-            except NotImplementedError as error:
-                messages.error(request, str(error))
-            except PuenteIAError as error:
-                messages.error(request, str(error))
-            else:
-                conversacion = generado['conversacion']
-                propuestas_generadas = generado['propuestas']
-                es_demo = generado['resultado'].get('demostracion', True)
-                if request.user.is_authenticated:
-                    mensajes_guardado = (
-                        'Tus propuestas de demostración se guardaron.'
-                        if es_demo else 'Tus imágenes generadas por IA se guardaron.'
-                    )
-                    messages.success(request, f'{mensajes_guardado} Explóralas y marca tus favoritas.')
-                    return redirect(f'{reverse("disenador:asistente")}?c={conversacion.pk}')
-
-                request.session['propuestas_demo'] = propuestas_generadas
-                messages.info(
-                    request,
-                    'Inicia sesión para guardar y reutilizar tus propuestas de diseño.',
-                )
-                return redirect('disenador:asistente')
+    if request.GET.get('nueva'):
+        conv_id = None
+    conversacion, propuestas, timeline = servicio_diseno.estado_asistente(request.user, conv_id)
+    if request.GET.get('nueva'):
+        conversacion, propuestas, timeline = None, [], []
 
     contexto = {
-        'form': formulario,
         'conversacion': conversacion,
         'propuestas': propuestas,
+        'timeline': timeline,
     }
     return render(request, 'disenador/asistente.html', contexto)
 
@@ -79,8 +46,8 @@ def conversar(request):
         messages.error(request, 'No se encontró esa conversación.')
         return redirect('disenador:asistente')
     try:
-        conversacion = servicio_diseno.conversar(
-            request.user, texto, conversacion_id=conversacion_id
+        conversacion = servicio_diseno.procesar_turno(
+            request.user, texto, request, conversacion_id=conversacion_id
         )
     except PuenteIAError as error:
         messages.error(request, str(error))

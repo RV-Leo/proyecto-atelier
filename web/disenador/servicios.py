@@ -8,13 +8,16 @@ Las propuestas de demostración se identifican claramente en la interfaz.
 
 import random
 import re
+import base64
 from urllib.parse import urlparse
+from django.db.models import Q
+from catalogo.models import Producto
 
 from django.conf import settings
 
 from catalogo.repositories import CatalogoRepository
 from core.placeholder import generar_textura_tela
-from .ia_gateway import PuenteIAError, descargar_imagen_backend, solicitar_backend
+from .ia_gateway import ClientePuenteIA, PuenteIAError, descargar_imagen_backend, solicitar_backend
 
 SUFIJOS_DESCRIPCION = [
     'con acabados limpios y silueta relajada',
@@ -180,6 +183,24 @@ class ProveedorBackend(ProveedorDiseno):
             'demostracion': False,
         }
 
+    def editar(self, propuesta, instruccion):
+        if not propuesta.imagen:
+            raise PuenteIAError('No se encontró una imagen anterior para editar.')
+        propuesta.imagen.open('rb')
+        try:
+            contenido = propuesta.imagen.read()
+        finally:
+            propuesta.imagen.close()
+        encoded = base64.b64encode(contenido).decode('ascii')
+        nombre = propuesta.imagen.name.lower()
+        tipo = ('image/jpeg' if nombre.endswith(('.jpg', '.jpeg')) else
+                'image/webp' if nombre.endswith('.webp') else 'image/png')
+        bytes_imagen, ruta = ClientePuenteIA().editar_imagen(instruccion, encoded, tipo)
+        extension = ruta.rsplit('.', 1)[-1].split('?', 1)[0]
+        if extension not in {'png', 'jpg', 'jpeg', 'webp'}:
+            extension = 'png'
+        return bytes_imagen, f'edicion-{propuesta.pk}.{extension}'
+
 
 def obtener_proveedor():
     """Devuelve el proveedor configurado en settings.AI_PROVEEDOR."""
@@ -187,3 +208,39 @@ def obtener_proveedor():
     if nombre in {'backend', 'qwen'}:
         return ProveedorBackend()
     return ProveedorDemo()
+
+
+def contexto_catalogo(texto, request=None):
+    """Busca productos públicos del catálogo y forma contexto verificable para la IA."""
+    ignorar = {'que', 'qué', 'como', 'cómo', 'hay', 'tienen', 'tiene', 'quiero', 'ver',
+               'para', 'con', 'por', 'una', 'uno', 'los', 'las', 'del', 'de', 'un', 'en',
+               'me', 'puedes', 'puedo', 'recomiendas', 'recomendar', 'dime', 'hola', 'favor'}
+    palabras = [p for p in re.findall(r'[\wáéíóúñ]+', texto.lower())
+                if len(p) > 2 and p not in ignorar]
+    consulta = Producto.objects.all()
+    no_hubo_coincidencia = False
+    if palabras:
+        filtro = Q()
+        for palabra in palabras[:8]:
+            filtro |= Q(nombre__icontains=palabra) | Q(descripcion__icontains=palabra) | Q(
+                composicion__icontains=palabra
+            ) | Q(color__icontains=palabra) | Q(tipo__icontains=palabra)
+        productos = list(consulta.filter(filtro).distinct()[:5])
+        no_hubo_coincidencia = not productos
+    else:
+        productos = list(consulta.order_by('-es_destacado', '-actualizado')[:5])
+    if no_hubo_coincidencia:
+        return ('No se encontraron productos que coincidan con la búsqueda de la persona en el catálogo actual. '
+                'Dile con claridad que no aparece un resultado para esa consulta y pregúntale si quiere probar '
+                'con otro tipo, color o material. No sugieras nombres, precios ni stock que no estén confirmados.')
+    lineas = []
+    for p in productos:
+        disponibilidad = 'disponible' if p.disponible else 'agotado'
+        enlace = request.build_absolute_uri(p.get_absolute_url()) if request else p.get_absolute_url()
+        lineas.append(
+            f'- {p.nombre} ({p.get_tipo_display()}): S/ {p.precio}; {disponibilidad}; '
+            f'stock {p.unidades}; color {p.color or "no indicado"}; '
+            f'composición {p.composicion or "no indicada"}; {p.descripcion[:220]}; enlace {enlace}'
+        )
+    return ('Catálogo real de ATELIER (usa solo estos datos para responder sobre productos, '
+            'precios y existencias; si no aparece el artículo, dilo claramente):\n' + '\n'.join(lineas))

@@ -85,9 +85,22 @@ def descargar_imagen_backend(ruta):
 class ClientePuenteIA:
     """Envía el historial del chat al endpoint común de Atelier."""
 
-    def conversar(self, mensajes):
-        respuesta = solicitar_backend('/api/v1/ia/chat', cuerpo={'messages': mensajes})
+    def conversar(self, mensajes, contexto=''):
+        respuesta = solicitar_backend(
+            '/api/v1/ia/chat', cuerpo={'messages': mensajes, 'contexto': contexto}
+        )
         texto = respuesta.get('respuesta') if isinstance(respuesta, dict) else None
         if not isinstance(texto, str) or not texto.strip():
             raise PuenteIAError('El backend de IA no devolvió una respuesta de texto.')
         return texto.strip()
+
+    def editar_imagen(self, prompt, imagen_base64, content_type='image/png'):
+        respuesta = solicitar_backend(
+            '/api/v1/ia/images/edits',
+            cuerpo={'prompt': prompt, 'imageBase64': imagen_base64, 'contentType': content_type},
+            timeout=getattr(settings, 'AI_BACKEND_IMAGE_TIMEOUT', 240),
+        )
+        ruta = respuesta.get('imagenUrl') if isinstance(respuesta, dict) else None
+        if not ruta:
+            raise PuenteIAError('El backend no devolvió la imagen editada.')
+        return descargar_imagen_backend(ruta), ruta
