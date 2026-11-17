@@ -120,6 +120,9 @@ volver al diseño, sin improvisar temas externos.
 - El chat puede consultar prendas y telas del catálogo; si la API no ofrece un
   dato como el precio minorista de una prenda, el asistente debe indicarlo sin
   inventar una cifra.
+- Cuando el asistente genera una propuesta, el backend devuelve su URL en
+  `imagenes`; Django descarga la imagen y la guarda como propuesta de la
+  conversación para mostrarla en el hilo y en el historial.
 - Las ediciones envían la última imagen como referencia y guardan el resultado
   como una versión nueva de la conversación.
 

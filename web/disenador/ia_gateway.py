@@ -2,6 +2,7 @@
 
 import base64
 import json
+from dataclasses import dataclass
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from urllib.parse import urljoin, urlparse
@@ -11,6 +12,14 @@ from django.conf import settings
 
 class PuenteIAError(Exception):
     """Error legible al comunicarse con el backend o el proveedor de IA."""
+
+
+@dataclass(frozen=True)
+class RespuestaChat:
+    """Texto del asistente y rutas de las imágenes que generó en el turno."""
+
+    texto: str
+    imagenes: tuple[str, ...] = ()
 
 
 def solicitar_backend(ruta, metodo='POST', cuerpo=None, bytes_respuesta=False, timeout=None):
@@ -92,7 +101,12 @@ class ClientePuenteIA:
         texto = respuesta.get('respuesta') if isinstance(respuesta, dict) else None
         if not isinstance(texto, str) or not texto.strip():
             raise PuenteIAError('El backend de IA no devolvió una respuesta de texto.')
-        return texto.strip()
+        rutas = respuesta.get('imagenes') if isinstance(respuesta, dict) else None
+        imagenes = tuple(
+            ruta.strip() for ruta in rutas
+            if isinstance(ruta, str) and ruta.strip()
+        ) if isinstance(rutas, list) else ()
+        return RespuestaChat(texto.strip(), imagenes)
 
     def editar_imagen(self, prompt, imagen_base64, content_type='image/png'):
         respuesta = solicitar_backend(

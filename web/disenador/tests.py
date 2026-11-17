@@ -2,18 +2,22 @@
 
 import shutil
 import tempfile
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase, override_settings
+from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 
 from catalogo.models import Material
 
-from .models import Conversacion, PropuestaDiseno
+from .ia_gateway import PuenteIAError, RespuestaChat
+from .models import Conversacion, Mensaje, PropuestaDiseno
+from .services import DisenoService
 from .servicios import ProveedorDemo, obtener_proveedor
 
 Usuario = get_user_model()
 MEDIA_TEMPORAL = tempfile.mkdtemp()
+MEDIA_CHAT = tempfile.mkdtemp()
 
 
 @override_settings(MEDIA_ROOT=MEDIA_TEMPORAL, AI_PROVEEDOR='demo')
@@ -63,27 +67,36 @@ class AsistenteVistasTests(TestCase):
         respuesta = self.client.get(reverse('disenador:asistente'))
         self.assertEqual(respuesta.status_code, 200)
         self.assertContains(respuesta, 'Diseñador IA')
-        self.assertContains(respuesta, 'modo demostración')
+        self.assertContains(respuesta, 'Chat con Atelier IA')
 
     def test_post_anonimo_no_guarda_y_avisa(self):
-        respuesta = self.client.post(reverse('disenador:asistente'), self.datos)
+        respuesta = self.client.post(
+            reverse('disenador:conversar'), {'mensaje': 'Hola, ¿qué telas hay?'}
+        )
         self.assertEqual(respuesta.status_code, 302)
+        self.assertIn(reverse('cuentas:acceder'), respuesta.url)
         self.assertFalse(PropuestaDiseno.objects.exists())
-        self.assertEqual(len(self.client.session.get('propuestas_demo', [])), 3)
-        # El GET muestra las propuestas y limpia la sesión.
-        pagina = self.client.get(reverse('disenador:asistente'))
-        self.assertContains(pagina, 'Propuesta 1')
-        self.assertEqual(self.client.session.get('propuestas_demo', []), [])
 
     def test_post_autenticado_guarda_conversacion_y_propuestas(self):
         Usuario.objects.create_user('disenadora', password='clave-segura-123')
         self.client.login(username='disenadora', password='clave-segura-123')
-        respuesta = self.client.post(reverse('disenador:asistente'), self.datos)
+        from . import views
+
+        puente = PuenteFalso(RespuestaChat('Hola, soy Atelier IA.'))
+        with patch.object(views.servicio_diseno, 'puente_ia', puente):
+            respuesta = self.client.post(
+                reverse('disenador:conversar'), {'mensaje': 'Hola, ¿qué telas hay?'}
+            )
         conversacion = Conversacion.objects.get()
-        self.assertRedirects(respuesta, reverse('disenador:asistente') + f'?c={conversacion.pk}')
+        self.assertRedirects(
+            respuesta, reverse('disenador:asistente') + f'?c={conversacion.pk}#chat',
+            fetch_redirect_response=False,
+        )
         self.assertEqual(conversacion.mensajes.count(), 2)
-        self.assertEqual(conversacion.propuestas.count(), 3)
-        self.assertTrue(all(p.es_demo for p in conversacion.propuestas.all()))
+        self.assertEqual(
+            conversacion.mensajes.get(rol=Mensaje.Rol.ASISTENTE).texto,
+            'Hola, soy Atelier IA.',
+        )
 
     def test_favorita_requiere_sesion(self):
         respuesta = self.client.post(reverse('disenador:alternar_favorita', args=[1]))
@@ -112,3 +125,67 @@ class AsistenteVistasTests(TestCase):
     def test_historial_requiere_sesion(self):
         respuesta = self.client.get(reverse('disenador:historial'))
         self.assertEqual(respuesta.status_code, 302)
+
+
+class PuenteFalso:
+    """Sustituye al cliente HTTP para probar el turno sin backend real."""
+
+    def __init__(self, respuesta):
+        self.respuesta = respuesta
+        self.llamada = None
+
+    def conversar(self, mensajes, contexto=''):
+        self.llamada = (mensajes, contexto)
+        return self.respuesta
+
+
+@override_settings(MEDIA_ROOT=MEDIA_CHAT)
+class ChatConHerramientasTests(TestCase):
+    """El chat guarda las imágenes que devuelve el asistente del backend."""
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(MEDIA_CHAT, ignore_errors=True)
+
+    def setUp(self):
+        self.usuario = Usuario.objects.create_user('chat-ia', password='clave-segura-123')
+        self.request = RequestFactory().get('/disenador/')
+        self.request.user = self.usuario
+
+    @patch('disenador.services.descargar_imagen_backend')
+    def test_guarda_la_imagen_generada_en_el_turno(self, descargar):
+        descargar.return_value = b'\xff\xd8\xff\xe0imagen'
+        puente = PuenteFalso(RespuestaChat(
+            'Generé una propuesta para tu prenda.',
+            ('/imagenes/2026-11-17/propuesta.jpg',),
+        ))
+        servicio = DisenoService(puente_ia=puente)
+
+        conversacion = servicio.procesar_turno(
+            self.usuario, '¿Me ayudas con una idea para el verano?', self.request
+        )
+
+        self.assertEqual(conversacion.mensajes.filter(rol=Mensaje.Rol.ASISTENTE).count(), 1)
+        propuesta = conversacion.propuestas.get()
+        self.assertFalse(propuesta.es_demo)
+        self.assertTrue(propuesta.imagen.name.endswith('.jpg'))
+        self.assertTrue(propuesta.imagen.storage.exists(propuesta.imagen.name))
+        descargar.assert_called_once_with('/imagenes/2026-11-17/propuesta.jpg')
+
+    @patch('disenador.services.descargar_imagen_backend')
+    def test_si_la_descarga_falla_igual_responde(self, descargar):
+        descargar.side_effect = PuenteIAError('sin imagen')
+        puente = PuenteFalso(RespuestaChat(
+            'No pude mostrar la imagen.',
+            ('/imagenes/no-existe.jpg',),
+        ))
+        servicio = DisenoService(puente_ia=puente)
+
+        conversacion = servicio.procesar_turno(
+            self.usuario, 'Muéstrame la propuesta de la prenda.', self.request
+        )
+
+        self.assertEqual(conversacion.propuestas.count(), 0)
+        mensaje = conversacion.mensajes.get(rol=Mensaje.Rol.ASISTENTE)
+        self.assertIn('No pude mostrar', mensaje.texto)

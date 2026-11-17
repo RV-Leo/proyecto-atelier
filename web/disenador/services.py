@@ -1,11 +1,17 @@
 """Casos de uso del asistente de diseño."""
 
+import logging
+from urllib.parse import urlparse
+from uuid import uuid4
+
 from django.core.files.base import ContentFile
-from .ia_gateway import ClientePuenteIA
+from .ia_gateway import ClientePuenteIA, PuenteIAError, descargar_imagen_backend
 from .models import Mensaje
 from .repositories import DisenadorRepository
 from .servicios import ProveedorDemo, obtener_proveedor
 from .servicios import contexto_catalogo
+
+log = logging.getLogger(__name__)
 
 
 class DisenoService:
@@ -39,7 +45,8 @@ class DisenoService:
             titulo = texto[:60] + ('…' if len(texto) > 60 else '')
             conversacion = self.repository.crear_conversacion(usuario, titulo)
         self.repository.crear_mensaje(conversacion, Mensaje.Rol.USUARIO, texto)
-        self.repository.crear_mensaje(conversacion, Mensaje.Rol.ASISTENTE, respuesta)
+        self.repository.crear_mensaje(conversacion, Mensaje.Rol.ASISTENTE, respuesta.texto)
+        self._guardar_imagenes_chat(usuario, conversacion, texto, respuesta)
         return conversacion
 
     def procesar_turno(self, usuario, texto, request, conversacion_id=None):
@@ -110,8 +117,36 @@ class DisenoService:
 
         contexto = contexto_catalogo(texto, request)
         respuesta = self.puente_ia.conversar(mensajes, contexto=contexto)
-        self.repository.crear_mensaje(conversacion, Mensaje.Rol.ASISTENTE, respuesta)
+        self.repository.crear_mensaje(conversacion, Mensaje.Rol.ASISTENTE, respuesta.texto)
+        self._guardar_imagenes_chat(usuario, conversacion, texto, respuesta)
         return conversacion
+
+    def _guardar_imagenes_chat(self, usuario, conversacion, prompt, respuesta):
+        """Descarga y guarda en la web las imágenes que generó el asistente.
+
+        El backend guarda la propuesta ligada a su prenda; la web necesita su
+        propia copia para pintarla en el hilo y en el historial. Si una imagen
+        no se puede descargar, la conversación sigue y solo se pierde esa vista.
+        """
+        for indice, ruta in enumerate(respuesta.imagenes, start=1):
+            try:
+                contenido = descargar_imagen_backend(ruta)
+            except PuenteIAError as error:
+                log.warning('No se pudo descargar la imagen %s: %s', ruta, error)
+                continue
+            extension = urlparse(ruta).path.rsplit('.', 1)[-1].lower()
+            if extension not in {'png', 'jpg', 'jpeg', 'webp'}:
+                extension = 'png'
+            self.repository.crear_propuesta(
+                usuario=usuario, conversacion=conversacion, prompt=prompt,
+                tipo_prenda='Diseño personalizado', estilo='', temporada='',
+                calidad='', paleta='', resultado_resumen=respuesta.texto,
+                imagen=ContentFile(
+                    contenido,
+                    name=f'propuesta-chat-{indice}-{uuid4().hex[:8]}.{extension}',
+                ),
+                es_favorita=False, es_demo=False,
+            )
 
     def _guardar_propuestas(self, usuario, conversacion, prompt, resultado):
         for propuesta in resultado['propuestas'][:1]:
