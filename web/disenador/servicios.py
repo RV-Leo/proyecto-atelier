@@ -183,9 +183,14 @@ class ProveedorBackend(ProveedorDiseno):
         return resp.content
 
     def generar(self, resumen, opciones):
-        esfuerzo = int(opciones.get("esfuerzo", 3))
+        # Pollinations gratuito permite 1 imagen cada 45 s por IP. Pedir varias
+        # imágenes en la misma petición devuelve 402 y el backend responde 503,
+        # así que por defecto se pide una sola imagen por diseño.
+        esfuerzo = int(opciones.get("esfuerzo", 1))
+        maximo = int(getattr(settings, 'AI_MAX_IMAGENES', 1))
+        cantidad = max(1, min(esfuerzo, maximo))
         prenda_id = self._crear_prenda(resumen, opciones)
-        datos = self._generar_propuestas(prenda_id, esfuerzo)
+        datos = self._generar_propuestas(prenda_id, cantidad)
 
         propuestas = []
         for i, item in enumerate(datos):

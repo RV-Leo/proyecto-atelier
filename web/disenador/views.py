@@ -1,5 +1,7 @@
 """Vistas del asistente de diseño con IA."""
 
+import logging
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.files.base import ContentFile
@@ -10,6 +12,31 @@ from django.views.decorators.http import require_POST
 from .forms import DisenoForm
 from .models import Conversacion, Mensaje, PropuestaDiseno
 from .servicios import obtener_proveedor
+
+logger = logging.getLogger(__name__)
+
+
+def _mensaje_de_error(error):
+    """Traduce fallos del backend en un aviso entendible para el usuario."""
+    respuesta = getattr(error, 'response', None)
+    codigo = getattr(respuesta, 'status_code', None)
+    if codigo == 503:
+        return (
+            'La IA de imágenes no está disponible ahora mismo. El proveedor '
+            'gratuito permite una imagen cada 45 segundos: espera un momento '
+            'e inténtalo de nuevo.'
+        )
+    if codigo in (401, 403):
+        return (
+            'El backend rechazó las credenciales. Revisa API_USER y '
+            'API_PASSWORD en web/.env.'
+        )
+    if codigo:
+        return f'El backend devolvió un error {codigo}. Inténtalo de nuevo en unos segundos.'
+    return (
+        'No se pudo conectar con el backend. Comprueba que esté arrancado en '
+        'http://localhost:8080.'
+    )
 
 
 def asistente(request):
@@ -40,6 +67,14 @@ def asistente(request):
                 messages.error(request, str(error))
                 return render(request, 'disenador/asistente.html', {
                     'form': form, 'conversacion': None, 'propuestas': [],
+                })
+            except Exception as error:  # el usuario debe ver un aviso, no un 500
+                logger.exception('Fallo al generar el diseño')
+                messages.error(request, _mensaje_de_error(error))
+                return render(request, 'disenador/asistente.html', {
+                    'form': form,
+                    'conversacion': conversacion,
+                    'propuestas': propuestas,
                 })
 
             propuestas_generadas = resultado['propuestas']
