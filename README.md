@@ -180,6 +180,44 @@ credenciales Basic del backend local. Las claves de Gemini y Pollinations se
 configuran por separado en `backend/src/main/resources/application-local.properties`;
 no se guardan en la web ni se suben a GitHub.
 
+### Preparar el proyecto en otro equipo
+
+El push publica el código, pero no copia las claves de IA, las bases de datos ni
+las imágenes generadas localmente. En el nuevo equipo:
+
+1. Instala Java 21 y Python, clona el repositorio y conserva las claves de Gemini
+   y Pollinations en un gestor seguro.
+2. En PowerShell, configura las claves para la sesión antes de iniciar el
+   backend (reemplaza los marcadores localmente; nunca los pegues en Git):
+
+   ```powershell
+   $env:GEMINI_API_KEY = "<clave Gemini>"
+   $env:POLLINATIONS_API_KEY = "<clave Pollinations>"
+   Copy-Item backend/src/main/resources/application-local.properties.example backend/src/main/resources/application-local.properties
+   Set-Location backend
+   .\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=local
+   ```
+
+3. En otra terminal, prepara y ejecuta Django:
+
+   ```powershell
+   Copy-Item web/.env.example web/.env
+   Set-Location web
+   py -m venv .venv
+   .\.venv\Scripts\Activate.ps1
+   pip install -r requirements.txt
+   py manage.py migrate
+   py manage.py cargar_demo
+   py manage.py runserver
+   ```
+
+   Abre `http://127.0.0.1:8000`. `web/.env` mantiene el backend en
+   `http://localhost:8080`; ambos procesos deben estar activos en ese equipo.
+4. Para compartir las mismas cuentas, conversaciones, productos e imágenes entre
+   dispositivos se necesita desplegar la web y el backend en servidores
+   accesibles y configurar almacenamiento/base de datos compartidos. Los datos
+   locales SQLite/H2 y las claves privadas no viajan con GitHub.
+
 ### Móvil (Kotlin) — plan futuro
 
 Hoy el catálogo móvil usa `DatosFake.productos`. Retrofit ya está en el proyecto, pero solo se usa para el chat de IA (`ClienteApiIa`). Para conectarlo al backend:
