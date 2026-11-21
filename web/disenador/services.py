@@ -43,31 +43,31 @@ class DisenoService:
         self.repository.crear_mensaje(conversacion, Mensaje.Rol.ASISTENTE, respuesta)
         return conversacion
 
-    def procesar_turno(
-        self, usuario, texto, request, conversacion_id=None, mensaje_existente_id=None
-    ):
+    def procesar_turno(self, usuario, texto, request, conversacion_id=None):
         """Resuelve consultas de catálogo, creación y edición desde un solo chat."""
-        mensaje_existente = (
-            self.repository.mensaje_usuario(usuario, mensaje_existente_id)
-            if mensaje_existente_id else None
-        )
-        conversacion = mensaje_existente.conversacion if mensaje_existente else (
+        conversacion = (
             self.repository.conversacion_usuario(usuario, conversacion_id)
             if conversacion_id else None
         )
         if not conversacion:
             conversacion = self.repository.crear_conversacion(usuario, texto[:60])
 
-        historial = []
-        for mensaje in self.repository.mensajes_recientes(conversacion):
-            if mensaje_existente and mensaje.pk == mensaje_existente.pk:
-                continue
-            historial.append({
+        historial = [
+            {
                 'role': 'user' if mensaje.rol == Mensaje.Rol.USUARIO else 'assistant',
                 'content': mensaje.texto[:4000],
-            })
+            }
+            for mensaje in self.repository.mensajes_recientes(conversacion)
+        ]
         mensajes = (historial + [{'role': 'user', 'content': texto}])[-20:]
         propuesta = conversacion.propuestas.order_by('-creada').first()
+        self.repository.crear_mensaje(conversacion, Mensaje.Rol.USUARIO, texto)
+
+        resultado = self._preparar_respuesta(usuario, texto, request, mensajes, propuesta)
+        return self._guardar_respuesta(usuario, conversacion, texto, resultado)
+
+    def _preparar_respuesta(self, usuario, texto, request, mensajes, propuesta):
+        """Obtiene la respuesta de IA sin mantener transacciones de escritura."""
         lower = texto.lower()
         quiere_editar = bool(propuesta and any(k in lower for k in (
             'cambia', 'cambiar', 'cámbia', 'cambialo', 'modifica', 'modificar', 'edita', 'editar',
@@ -81,27 +81,16 @@ class DisenoService:
             'imagina una prenda', 'quiero un diseño', 'quiero diseñar', 'quiero disenar',
             'hazme un diseño', 'hazme un diseno', 'hazme una imagen',
         ))
-        if not mensaje_existente:
-            self.repository.crear_mensaje(conversacion, Mensaje.Rol.USUARIO, texto)
 
         if quiere_editar:
             proveedor = self.proveedor() if callable(self.proveedor) else self.proveedor
             if not hasattr(proveedor, 'editar'):
                 raise PuenteIAError('La edición de imágenes requiere el proveedor de IA conectado.')
             bytes_imagen, nombre = proveedor.editar(propuesta, texto)
-            nueva = self.repository.crear_propuesta(
-                usuario=usuario, conversacion=conversacion, prompt=texto,
-                tipo_prenda=propuesta.tipo_prenda, estilo=propuesta.estilo,
-                temporada=propuesta.temporada, calidad=propuesta.calidad,
-                paleta=propuesta.paleta, resultado_resumen=f'Edición: {texto}',
-                imagen=ContentFile(bytes_imagen, name=nombre), es_favorita=False,
-                es_demo=False,
-            )
-            self.repository.crear_mensaje(
-                conversacion, Mensaje.Rol.ASISTENTE,
-                'He actualizado el diseño con el cambio que pediste. La nueva versión aparece aquí; la anterior queda guardada en la conversación.',
-            )
-            return conversacion
+            return {
+                'tipo': 'edicion_imagen', 'propuesta': propuesta,
+                'bytes': bytes_imagen, 'nombre': nombre,
+            }
 
         if quiere_crear:
             proveedor = self.proveedor() if callable(self.proveedor) else self.proveedor
@@ -110,17 +99,41 @@ class DisenoService:
                     'tipo_prenda': 'diseño personalizado', 'estilo': 'según tu descripción',
                     'temporada': '', 'calidad': 'alta', 'paleta': '',
                 })
-                self._guardar_propuestas(usuario, conversacion, texto, resultado)
-                self.repository.crear_mensaje(
-                    conversacion, Mensaje.Rol.ASISTENTE,
-                    'Generé una imagen para tu pedido. Puedes pedirme cambios aquí mismo.',
-                )
-                return conversacion
+                return {'tipo': 'crear_imagen', 'resultado': resultado}
             raise PuenteIAError('La generación de imágenes requiere el proveedor de IA conectado.')
 
         contexto = contexto_catalogo(texto, request)
         respuesta = self.puente_ia.conversar(mensajes, contexto=contexto)
-        self.repository.crear_mensaje(conversacion, Mensaje.Rol.ASISTENTE, respuesta)
+        return {'tipo': 'texto', 'respuesta': respuesta}
+
+    def _guardar_respuesta(self, usuario, conversacion, texto, resultado):
+        """Guarda la respuesta ya recibida en una transacción corta."""
+        with transaction.atomic():
+            if resultado['tipo'] == 'edicion_imagen':
+                propuesta = resultado['propuesta']
+                self.repository.crear_propuesta(
+                    usuario=usuario, conversacion=conversacion, prompt=texto,
+                    tipo_prenda=propuesta.tipo_prenda, estilo=propuesta.estilo,
+                    temporada=propuesta.temporada, calidad=propuesta.calidad,
+                    paleta=propuesta.paleta, resultado_resumen=f'Edición: {texto}',
+                    imagen=ContentFile(resultado['bytes'], name=resultado['nombre']),
+                    es_favorita=False, es_demo=False,
+                )
+                respuesta = (
+                    'He actualizado el diseño con el cambio que pediste. La nueva versión aparece aquí; '
+                    'la anterior queda guardada en la conversación.'
+                )
+                self.repository.crear_mensaje(conversacion, Mensaje.Rol.ASISTENTE, respuesta)
+            elif resultado['tipo'] == 'crear_imagen':
+                self._guardar_propuestas(usuario, conversacion, texto, resultado['resultado'])
+                self.repository.crear_mensaje(
+                    conversacion, Mensaje.Rol.ASISTENTE,
+                    'Generé una imagen para tu pedido. Puedes pedirme cambios aquí mismo.',
+                )
+            else:
+                self.repository.crear_mensaje(
+                    conversacion, Mensaje.Rol.ASISTENTE, resultado['respuesta']
+                )
         return conversacion
 
     def editar_mensaje(self, usuario, mensaje_id, texto, request):
@@ -128,28 +141,52 @@ class DisenoService:
 
         Los mensajes posteriores salen de la conversación actual. Los diseños
         posteriores se conservan en Mis diseños, pero se desvinculan del chat.
-        Si el proveedor falla, la transacción restaura el historial anterior.
+        La llamada externa se realiza antes de abrir las transacciones de escritura.
+        Si la IA falla, el historial original permanece intacto.
         """
         mensaje = self.repository.mensaje_usuario(usuario, mensaje_id)
         conversacion = mensaje.conversacion
+        ultimo_mensaje_existente = (
+            conversacion.mensajes.order_by('-pk').values_list('pk', flat=True).first() or 0
+        )
+        ultima_propuesta_existente = (
+            conversacion.propuestas.order_by('-pk').values_list('pk', flat=True).first() or 0
+        )
+
+        # Esta parte puede esperar a Gemini o al generador de imágenes. No se
+        # mantiene un bloqueo de escritura de SQLite durante esa llamada.
+        previos = list(
+            conversacion.mensajes.filter(pk__lt=mensaje.pk).order_by('-creada')[:19]
+        )
+        previos.reverse()
+        historial = [
+            {
+                'role': 'user' if anterior.rol == Mensaje.Rol.USUARIO else 'assistant',
+                'content': anterior.texto[:4000],
+            }
+            for anterior in previos
+        ]
+        mensajes = (historial + [{'role': 'user', 'content': texto}])[-20:]
+        propuesta = conversacion.propuestas.filter(
+            creada__lt=mensaje.creada
+        ).order_by('-creada').first()
+        resultado = self._preparar_respuesta(usuario, texto, request, mensajes, propuesta)
 
         with transaction.atomic():
-            conversacion.mensajes.filter(pk__gt=mensaje.pk).delete()
-            conversacion.propuestas.filter(creada__gte=mensaje.creada).update(conversacion=None)
+            conversacion.mensajes.filter(
+                pk__gt=mensaje.pk, pk__lte=ultimo_mensaje_existente
+            ).delete()
+            conversacion.propuestas.filter(
+                pk__lte=ultima_propuesta_existente,
+                creada__gte=mensaje.creada,
+            ).update(conversacion=None)
             mensaje.texto = texto
             mensaje.save(update_fields=['texto'])
 
-            if not conversacion.mensajes.exclude(pk=mensaje.pk).exists():
+            if not conversacion.mensajes.filter(pk__lt=mensaje.pk).exists():
                 conversacion.titulo = texto[:60] + ('…' if len(texto) > 60 else '')
                 conversacion.save(update_fields=['titulo'])
-
-            self.procesar_turno(
-                usuario,
-                texto,
-                request,
-                conversacion_id=conversacion.pk,
-                mensaje_existente_id=mensaje.pk,
-            )
+            self._guardar_respuesta(usuario, conversacion, texto, resultado)
         return conversacion
 
     def _guardar_propuestas(self, usuario, conversacion, prompt, resultado):

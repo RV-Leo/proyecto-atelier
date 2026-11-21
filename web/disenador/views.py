@@ -2,6 +2,7 @@
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import OperationalError
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -71,6 +72,7 @@ def editar_mensaje(request, pk):
         messages.error(request, 'El mensaje no puede superar los 4000 caracteres.')
         return redirect('disenador:asistente')
 
+    conversacion_id = None
     try:
         mensaje = servicio_diseno.repository.mensaje_usuario(request.user, pk)
         conversacion_id = mensaje.conversacion_id
@@ -80,6 +82,18 @@ def editar_mensaje(request, pk):
         conversacion = servicio_diseno.repository.conversacion_usuario(
             request.user, conversacion_id
         )
+    except OperationalError as error:
+        if 'database is locked' not in str(error).lower():
+            raise
+        messages.error(
+            request,
+            'La conversación está ocupada y no se pudo guardar el cambio. '
+            'Espera un momento y vuelve a intentarlo.',
+        )
+        destino = reverse('disenador:asistente')
+        if conversacion_id:
+            destino += f'?c={conversacion_id}'
+        return redirect(f'{destino}#chat')
     else:
         messages.success(request, 'Mensaje editado y conversación regenerada desde ese punto.')
 
