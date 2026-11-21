@@ -1,7 +1,8 @@
 """Casos de uso del asistente de diseño."""
 
 from django.core.files.base import ContentFile
-from .ia_gateway import ClientePuenteIA
+from django.db import transaction
+from .ia_gateway import ClientePuenteIA, PuenteIAError
 from .models import Mensaje
 from .repositories import DisenadorRepository
 from .servicios import ProveedorDemo, obtener_proveedor
@@ -42,9 +43,15 @@ class DisenoService:
         self.repository.crear_mensaje(conversacion, Mensaje.Rol.ASISTENTE, respuesta)
         return conversacion
 
-    def procesar_turno(self, usuario, texto, request, conversacion_id=None):
+    def procesar_turno(
+        self, usuario, texto, request, conversacion_id=None, mensaje_existente_id=None
+    ):
         """Resuelve consultas de catálogo, creación y edición desde un solo chat."""
-        conversacion = (
+        mensaje_existente = (
+            self.repository.mensaje_usuario(usuario, mensaje_existente_id)
+            if mensaje_existente_id else None
+        )
+        conversacion = mensaje_existente.conversacion if mensaje_existente else (
             self.repository.conversacion_usuario(usuario, conversacion_id)
             if conversacion_id else None
         )
@@ -53,6 +60,8 @@ class DisenoService:
 
         historial = []
         for mensaje in self.repository.mensajes_recientes(conversacion):
+            if mensaje_existente and mensaje.pk == mensaje_existente.pk:
+                continue
             historial.append({
                 'role': 'user' if mensaje.rol == Mensaje.Rol.USUARIO else 'assistant',
                 'content': mensaje.texto[:4000],
@@ -72,7 +81,8 @@ class DisenoService:
             'imagina una prenda', 'quiero un diseño', 'quiero diseñar', 'quiero disenar',
             'hazme un diseño', 'hazme un diseno', 'hazme una imagen',
         ))
-        self.repository.crear_mensaje(conversacion, Mensaje.Rol.USUARIO, texto)
+        if not mensaje_existente:
+            self.repository.crear_mensaje(conversacion, Mensaje.Rol.USUARIO, texto)
 
         if quiere_editar:
             proveedor = self.proveedor() if callable(self.proveedor) else self.proveedor
@@ -111,6 +121,35 @@ class DisenoService:
         contexto = contexto_catalogo(texto, request)
         respuesta = self.puente_ia.conversar(mensajes, contexto=contexto)
         self.repository.crear_mensaje(conversacion, Mensaje.Rol.ASISTENTE, respuesta)
+        return conversacion
+
+    def editar_mensaje(self, usuario, mensaje_id, texto, request):
+        """Reescribe un turno y vuelve a procesar la conversación desde ese punto.
+
+        Los mensajes posteriores salen de la conversación actual. Los diseños
+        posteriores se conservan en Mis diseños, pero se desvinculan del chat.
+        Si el proveedor falla, la transacción restaura el historial anterior.
+        """
+        mensaje = self.repository.mensaje_usuario(usuario, mensaje_id)
+        conversacion = mensaje.conversacion
+
+        with transaction.atomic():
+            conversacion.mensajes.filter(pk__gt=mensaje.pk).delete()
+            conversacion.propuestas.filter(creada__gte=mensaje.creada).update(conversacion=None)
+            mensaje.texto = texto
+            mensaje.save(update_fields=['texto'])
+
+            if not conversacion.mensajes.exclude(pk=mensaje.pk).exists():
+                conversacion.titulo = texto[:60] + ('…' if len(texto) > 60 else '')
+                conversacion.save(update_fields=['titulo'])
+
+            self.procesar_turno(
+                usuario,
+                texto,
+                request,
+                conversacion_id=conversacion.pk,
+                mensaje_existente_id=mensaje.pk,
+            )
         return conversacion
 
     def _guardar_propuestas(self, usuario, conversacion, prompt, resultado):

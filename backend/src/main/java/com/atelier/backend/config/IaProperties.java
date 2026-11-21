@@ -1,6 +1,7 @@
 package com.atelier.backend.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 
 /**
  * Configuración del puente de IA.
@@ -37,6 +38,10 @@ public record IaProperties(
         String directorioImagenes,
         String urlImagen,
         String apiKeyImagen) {
+
+    @ConstructorBinding
+    public IaProperties {
+    }
 
     /** Compatibilidad con las configuraciones anteriores del backend. */
     public IaProperties(

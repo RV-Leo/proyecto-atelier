@@ -13,7 +13,7 @@ spring.security.user.password=atelier-dev
 # Gemini se usa únicamente para texto y Pollinations únicamente para imágenes.
 atelier.ia.url=https://generativelanguage.googleapis.com/v1beta
 atelier.ia.api-key=${GEMINI_API_KEY:PEGA_AQUI_TU_CLAVE_DE_GEMINI}
-atelier.ia.modelo-texto=gemini-3.8-flash
+atelier.ia.modelo-texto=gemini-3.5-flash-lite
 atelier.ia.url-imagen=https://gen.pollinations.ai/v1
 atelier.ia.api-key-imagen=${POLLINATIONS_API_KEY:PEGA_AQUI_TU_CLAVE_DE_POLLINATIONS}
 atelier.ia.modelo-imagen=microsoft/mai-image-2.6-flash

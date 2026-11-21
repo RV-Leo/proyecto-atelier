@@ -41,7 +41,7 @@ El backend cumple los dos roles que pide el README:
 - `ClienteGemini` usa Gemini Interactions y su propia clave `GEMINI_API_KEY`.
 - `ClienteImagenPollinations` usa `POST /v1/images/generations` y `POST /v1/images/edits` con `POLLINATIONS_API_KEY`.
 - Las credenciales de Gemini y Pollinations nunca se envían al proveedor contrario. Las claves locales se mantienen en `application-local.properties`.
-- `GEMINI_MODELO_TEXTO=gemini-3.8-flash` responde el chat y `POLLINATIONS_MODELO_IMAGEN=microsoft/mai-image-2.6-flash` crea o edita imágenes.
+- `GEMINI_MODELO_TEXTO=gemini-3.5-flash-lite` responde el chat y `POLLINATIONS_MODELO_IMAGEN=microsoft/mai-image-2.6-flash` crea o edita imágenes.
 - `GuardadorImagenes` escribe PNG en disco bajo `atelier.ia.directorio-imagenes`, servible en `/imagenes/**` **sin autenticación** (crucial: un `<img>` no puede mandar Basic Auth).
 - `IaNoDisponibleException` → HTTP 503.
 
@@ -54,7 +54,7 @@ El backend cumple los dos roles que pide el README:
 | `POSTGRES_PASSWORD` | (vacío) | Contraseña. |
 | `GEMINI_URL` | `https://generativelanguage.googleapis.com/v1beta` | URL de Gemini Interactions. |
 | `GEMINI_API_KEY` | clave privada | Clave Gemini, solo en el backend. |
-| `GEMINI_MODELO_TEXTO` | `gemini-3.8-flash` | Modelo para conversaciones. |
+| `GEMINI_MODELO_TEXTO` | `gemini-3.5-flash-lite` | Modelo para conversaciones. |
 | `POLLINATIONS_URL` | `https://gen.pollinations.ai/v1` | URL API de imágenes. |
 | `POLLINATIONS_API_KEY` | clave privada | Clave Pollinations, solo en el backend. |
 | `POLLINATIONS_MODELO_IMAGEN` | `microsoft/mai-image-2.6-flash` | Modelo para generar y editar imágenes. |

@@ -52,6 +52,16 @@
     });
   });
 
+  // ---- Cancelar la edición de un mensaje del chat ----
+  document.querySelectorAll('[data-cancelar-edicion]').forEach(function (boton) {
+    boton.addEventListener('click', function () {
+      var formulario = boton.closest('form');
+      var editor = boton.closest('details');
+      if (formulario) { formulario.reset(); }
+      if (editor) { editor.open = false; }
+    });
+  });
+
   // ---- Contadores de métricas (solo lectura visual) ----
   document.querySelectorAll('[data-contador]').forEach(function (elemento) {
     var objetivo = parseInt(elemento.getAttribute('data-contador'), 10) || 0;

@@ -56,6 +56,12 @@
 			<artifactId>postgresql</artifactId>
 			<scope>runtime</scope>
 		</dependency>
+		<!-- Driver del perfil local H2 descrito en application-local.properties. -->
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
+			<scope>runtime</scope>
+		</dependency>
 
 		<!-- Flyway gestiona el esquema de la base con migraciones versionadas.
 		     En Spring Boot 4 la autoconfiguracion vive en spring-boot-flyway. -->

@@ -36,7 +36,7 @@ Atelier es un proyecto para el **rubro textil**. Reúne herramientas para crear 
 | Base de datos | PostgreSQL + Flyway (migraciones V1–V5) | 18 |
 | Web | Django (Python) | 5.2 / 3.13 |
 | Móvil | Kotlin / Android + Retrofit | — |
-| IA conversacional | **Google Gemini Interactions API** | `gemini-3.8-flash` |
+| IA conversacional | **Google Gemini Interactions API** | `gemini-3.5-flash-lite` |
 | Generación y edición de imágenes | **Pollinations AI** | `microsoft/mai-image-2.6-flash` |
 | Agentes (prototipo, rama) | FastAPI + Pydantic | 0.115 / 2.9 |
 
@@ -111,7 +111,7 @@ se muestra en /disenador/ e /disenador/historial/
 |---|---|---|
 | `GEMINI_URL` | `https://generativelanguage.googleapis.com/v1beta` en configuración local | API de texto Gemini. |
 | `GEMINI_API_KEY` | clave privada (solo backend) | Autenticación de Gemini. No se sube a Git. |
-| `GEMINI_MODELO_TEXTO` | `gemini-3.8-flash` | Modelo para el chat y las consultas. |
+| `GEMINI_MODELO_TEXTO` | `gemini-3.5-flash-lite` | Modelo para el chat y las consultas. |
 | `POLLINATIONS_URL` | `https://gen.pollinations.ai/v1` | API de imágenes Pollinations. |
 | `POLLINATIONS_API_KEY` | clave privada (solo backend) | Autenticación de Pollinations, separada de Gemini. |
 | `POLLINATIONS_MODELO_IMAGEN` | `microsoft/mai-image-2.6-flash` | Modelo para crear y editar imágenes. |

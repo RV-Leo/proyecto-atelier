@@ -61,6 +61,33 @@ def conversar(request):
 
 @login_required
 @require_POST
+def editar_mensaje(request, pk):
+    """Edita un mensaje propio y regenera la conversación desde ese turno."""
+    texto = request.POST.get('texto', '').strip()
+    if not texto:
+        messages.error(request, 'El mensaje editado no puede quedar vacío.')
+        return redirect('disenador:asistente')
+    if len(texto) > 4000:
+        messages.error(request, 'El mensaje no puede superar los 4000 caracteres.')
+        return redirect('disenador:asistente')
+
+    try:
+        mensaje = servicio_diseno.repository.mensaje_usuario(request.user, pk)
+        conversacion_id = mensaje.conversacion_id
+        conversacion = servicio_diseno.editar_mensaje(request.user, pk, texto, request)
+    except PuenteIAError as error:
+        messages.error(request, str(error))
+        conversacion = servicio_diseno.repository.conversacion_usuario(
+            request.user, conversacion_id
+        )
+    else:
+        messages.success(request, 'Mensaje editado y conversación regenerada desde ese punto.')
+
+    return redirect(f'{reverse("disenador:asistente")}?c={conversacion.pk}#chat')
+
+
+@login_required
+@require_POST
 def alternar_favorita(request, pk):
     """Marca o desmarca una propuesta propia como favorita."""
     es_favorita = servicio_diseno.alternar_favorita(request.user, pk)

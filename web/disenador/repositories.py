@@ -25,6 +25,15 @@ class DisenadorRepository:
         conversacion.save(update_fields=['actualizada'])
         return mensaje
 
+    def mensaje_usuario(self, usuario, pk):
+        """Obtiene un mensaje editable que pertenezca al usuario autenticado."""
+        return get_object_or_404(
+            Mensaje,
+            pk=pk,
+            rol=Mensaje.Rol.USUARIO,
+            conversacion__usuario=usuario,
+        )
+
     def mensajes_recientes(self, conversacion, limite=19):
         mensajes = list(conversacion.mensajes.order_by('-creada')[:limite])
         return list(reversed(mensajes))

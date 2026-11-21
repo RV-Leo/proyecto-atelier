@@ -31,10 +31,30 @@
         {% if timeline %}
           {% for evento in timeline %}
             {% if evento.tipo == 'mensaje' %}
-              <div class="mensaje mensaje-{% if evento.objeto.rol == 'usuario' %}usuario{% else %}asistente{% endif %}">
-                {% if evento.objeto.rol == 'asistente' %}<strong>ATELIER IA</strong><br>{% endif %}
-                {{ evento.objeto.texto|linebreaksbr }}
-              </div>
+              {% if evento.objeto.rol == 'usuario' %}<div class="mensaje-grupo-usuario">{% endif %}
+                <div class="mensaje mensaje-{% if evento.objeto.rol == 'usuario' %}usuario{% else %}asistente{% endif %}">
+                  {% if evento.objeto.rol == 'asistente' %}<strong>ATELIER IA</strong><br>{% endif %}
+                  {{ evento.objeto.texto|linebreaksbr }}
+                </div>
+                {% if evento.objeto.rol == 'usuario' and user.is_authenticated %}
+                  <div class="mensaje-acciones">
+                    <details class="mensaje-editar">
+                      <summary aria-label="Editar mensaje" title="Editar mensaje">
+                        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>
+                      </summary>
+                      <form method="post" action="{% url 'disenador:editar_mensaje' evento.objeto.pk %}">
+                        {% csrf_token %}
+                        <label class="sr-only" for="editar-mensaje-{{ evento.objeto.pk }}">Editar tu mensaje</label>
+                        <textarea id="editar-mensaje-{{ evento.objeto.pk }}" name="texto" rows="3" maxlength="4000" required>{{ evento.objeto.texto }}</textarea>
+                        <div class="mensaje-editar-acciones">
+                          <button class="btn-cancelar-edicion" type="button" data-cancelar-edicion>Cancelar</button>
+                          <button class="btn-enviar-edicion" type="submit">Enviar</button>
+                        </div>
+                      </form>
+                    </details>
+                  </div>
+                {% endif %}
+              {% if evento.objeto.rol == 'usuario' %}</div>{% endif %}
             {% else %}
               <article class="chat-imagen">
                 <div class="chat-imagen-cabecera"><strong>Diseño generado</strong><span class="insignia insignia-nuevo">IA</span></div>
