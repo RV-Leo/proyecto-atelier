@@ -45,6 +45,14 @@ El backend cumple los dos roles que pide el README:
 - `GuardadorImagenes` escribe PNG en disco bajo `atelier.ia.directorio-imagenes`, servible en `/imagenes/**` **sin autenticación** (crucial: un `<img>` no puede mandar Basic Auth).
 - `IaNoDisponibleException` → HTTP 503.
 
+#### Skill y agentes del chat
+
+- El skill de dominio está en `src/main/resources/skills/atelier-project.md` y se adjunta a las conversaciones antes de enviarlas al proveedor.
+- `OrquestadorAgentes` aplica una lista de temas permitidos y enruta a especialistas de catálogo, diseño textil, inventario/viabilidad, tendencias y funcionamiento del proyecto.
+- Las consultas fuera del alcance se responden localmente; no se envían a Gemini. El filtro también impide que una pregunta fuera de tema se cuele por el historial de una conversación previa.
+- Los especialistas respetan el contexto proporcionado por la aplicación. No sustituyen consultas a la base de datos ni afirman stock o precios ausentes.
+- Esta integración utiliza el Gemini ya configurado; los nombres de agentes son roles especializados del orquestador, no modelos independientes ni el worker FastAPI simulado de `feature/ai-worker`.
+
 #### Configuración (variables de entorno)
 
 | Variable | Por defecto | Descripción |
@@ -60,6 +68,13 @@ El backend cumple los dos roles que pide el README:
 | `POLLINATIONS_MODELO_IMAGEN` | `microsoft/mai-image-2.6-flash` | Modelo para generar y editar imágenes. |
 | `IA_TIMEOUT_SEGUNDOS` | `120` | Límite de espera. `<= 0` = sin límite. |
 | `IA_DIRECTORIO_IMAGENES` | `imagenes-diseno` | Donde se guardan los PNG. |
+
+Para desarrollo local en otro equipo, copia `src/main/resources/application-local.properties.example` a
+`src/main/resources/application-local.properties` (archivo ignorado por Git), configura
+`GEMINI_API_KEY` y `POLLINATIONS_API_KEY` en el entorno y ejecuta
+`./mvnw spring-boot:run -Dspring-boot.run.profiles=local` desde `backend/`.
+Gemini atiende el chat y Pollinations genera/edita imágenes; ambas claves son
+necesarias para todas las funciones de IA y no se deben commitear.
 
 #### Migraciones (Flyway)
 

@@ -3,7 +3,8 @@ package com.atelier.backend.ia;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.headerDoesNotExist;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
@@ -12,11 +13,11 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Base64;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -27,10 +28,8 @@ import com.atelier.backend.config.IaProperties;
 /**
  * Pruebas del generador de imágenes gratuito de Pollinations.
  *
- * <p>Se prueban aquí las tres peculiaridades que lo separan de un proveedor
- * compatible con OpenAI: pide por GET con el prompt en la ruta, devuelve los
- * bytes de la foto en vez de un JSON, y <strong>nunca</strong> debe recibir la
- * cabecera Authorization porque es un proveedor distinto del de texto.
+ * <p>Se valida el contrato actual: POST OpenAI-compatible con la clave propia
+ * de Pollinations y una imagen codificada en la respuesta JSON.
  */
 class ClienteImagenPollinationsTests {
 
@@ -48,9 +47,9 @@ class ClienteImagenPollinationsTests {
         MockRestServiceServer servidor = MockRestServiceServer.bindTo(builder).build();
         ClienteImagenPollinations cliente = cliente(builder);
 
-        servidor.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE + "/prompt/")))
-                .andExpect(method(HttpMethod.GET))
-                .andRespond(withSuccess(JPEG, MediaType.IMAGE_JPEG));
+        servidor.expect(requestTo(BASE + "/images/generations"))
+                .andExpect(method(org.springframework.http.HttpMethod.POST))
+                .andRespond(withSuccess(respuestaConImagen(), MediaType.APPLICATION_JSON));
 
         ClienteIa.ImagenGenerada imagen = cliente.generar("un vestido de lino", 1).get(0);
 
@@ -63,37 +62,32 @@ class ClienteImagenPollinationsTests {
         servidor.verify();
     }
 
-    /**
-     * El prompt viaja codificado dentro de la ruta: un espacio en blanco no
-     * puede partir la URL en dos.
-     */
+    /** El prompt viaja en el cuerpo JSON y no se pierde al serializarlo. */
     @Test
-    void codificaElPromptDentroDeLaRuta() {
+    void enviaElPromptEnElCuerpoJson() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer servidor = MockRestServiceServer.bindTo(builder).build();
         ClienteImagenPollinations cliente = cliente(builder);
 
-        servidor.expect(requestTo(org.hamcrest.Matchers.containsString(
-                        "/prompt/un%20vestido%20de%20lino%20color%20terracota")))
-                .andRespond(withSuccess(JPEG, MediaType.IMAGE_JPEG));
+        servidor.expect(requestTo(BASE + "/images/generations"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "un vestido de lino color terracota")))
+                .andRespond(withSuccess(respuestaConImagen(), MediaType.APPLICATION_JSON));
 
         cliente.generar("un vestido de lino color terracota", 1);
         servidor.verify();
     }
 
-    /**
-     * Pollinations es un proveedor externo distinto al de texto: mandarle la
-     * clave de Google sería filtrarla a un tercero.
-     */
+    /** Pollinations usa su clave de imagen y no la clave de Gemini. */
     @Test
-    void nuncaEnviaAuthorization() {
+    void usaLaClaveDePollinationsEnLaAutorizacion() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer servidor = MockRestServiceServer.bindTo(builder).build();
         ClienteImagenPollinations cliente = cliente(builder);
 
-        servidor.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE + "/prompt/")))
-                .andExpect(headerDoesNotExist(HttpHeaders.AUTHORIZATION))
-                .andRespond(withSuccess(JPEG, MediaType.IMAGE_JPEG));
+        servidor.expect(requestTo(BASE + "/images/generations"))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer test-pollinations-key"))
+                .andRespond(withSuccess(respuestaConImagen(), MediaType.APPLICATION_JSON));
 
         cliente.generar("una blusa", 1);
         servidor.verify();
@@ -106,7 +100,7 @@ class ClienteImagenPollinationsTests {
         MockRestServiceServer servidor = MockRestServiceServer.bindTo(builder).build();
         ClienteImagenPollinations cliente = cliente(builder);
 
-        servidor.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE + "/prompt/")))
+        servidor.expect(requestTo(BASE + "/images/generations"))
                 .andRespond(withServerError());
 
         assertThrows(IaNoDisponibleException.class, () -> cliente.generar("una blusa", 1));
@@ -119,40 +113,38 @@ class ClienteImagenPollinationsTests {
         MockRestServiceServer servidor = MockRestServiceServer.bindTo(builder).build();
         ClienteImagenPollinations cliente = cliente(builder);
 
-        servidor.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE + "/prompt/")))
-                .andRespond(withSuccess(new byte[0], MediaType.IMAGE_JPEG));
+        servidor.expect(requestTo(BASE + "/images/generations"))
+                .andRespond(withSuccess("{\"data\":[]}", MediaType.APPLICATION_JSON));
 
         assertThrows(IaNoDisponibleException.class, () -> cliente.generar("una blusa", 1));
     }
 
-    /**
-     * El 402 es el límite gratuito por IP, no una avería: si ya hay una imagen
-     * se devuelve el resultado parcial en lugar de fallar.
-     */
+    /** El proveedor reporta el límite de uso como error y el cliente lo traduce. */
     @Test
-    void devuelveLoObtenidoCuandoElLimiteDeRitmoAparecePorMItad() {
+    void convierteElLimiteDeUsoEnErrorDeServicioIa() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer servidor = MockRestServiceServer.bindTo(builder).build();
         ClienteImagenPollinations cliente = cliente(builder);
 
-        servidor.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE + "/prompt/")))
-                .andRespond(withSuccess(JPEG, MediaType.IMAGE_JPEG));
-        servidor.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE + "/prompt/")))
+        servidor.expect(requestTo(BASE + "/images/generations"))
                 .andRespond(withStatus(HttpStatus.PAYMENT_REQUIRED)
                         .header(HttpHeaders.RETRY_AFTER, "45")
                         .body("""
                                 {"status":402,"error":{"code":"FREE_LIMIT"}}"""));
 
-        var imagenes = cliente.generar("una blusa", 3);
-
-        assertEquals(1, imagenes.size(), "con una imagen ya entregada no se falla");
+        assertThrows(IaNoDisponibleException.class, () -> cliente.generar("una blusa", 1));
         servidor.verify();
+    }
+
+    private String respuestaConImagen() {
+        return "{\"data\":[{\"b64_json\":\""
+                + Base64.getEncoder().encodeToString(JPEG) + "\"}]}";
     }
 
     private ClienteImagenPollinations cliente(RestClient.Builder builder) {
         IaProperties propiedades = new IaProperties(
                 "https://gemini.test/v1", "", "gemini-texto", "", 0,
-                carpetaTemporal.toString(), BASE);
+                carpetaTemporal.toString(), BASE, "test-pollinations-key");
         return new ClienteImagenPollinations(propiedades, new GuardadorImagenes(propiedades), builder);
     }
 }

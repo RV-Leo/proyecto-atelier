@@ -14,6 +14,7 @@ import com.atelier.backend.api.dto.ChatIaResponse;
 import com.atelier.backend.api.dto.EditarImagenIaRequest;
 import com.atelier.backend.ia.ClienteIa;
 import com.atelier.backend.ia.ClienteIa.MensajeChat;
+import com.atelier.backend.ia.agentes.OrquestadorAgentes;
 
 import jakarta.validation.Valid;
 
@@ -23,9 +24,11 @@ import jakarta.validation.Valid;
 public class IaController {
 
     private final ClienteIa clienteIa;
+    private final OrquestadorAgentes agentes;
 
-    public IaController(ClienteIa clienteIa) {
+    public IaController(ClienteIa clienteIa, OrquestadorAgentes agentes) {
         this.clienteIa = clienteIa;
+        this.agentes = agentes;
     }
 
     @PostMapping("/chat")
@@ -33,7 +36,7 @@ public class IaController {
         List<MensajeChat> mensajes = solicitud.messages().stream()
                 .map(mensaje -> new MensajeChat(mensaje.role(), mensaje.content()))
                 .toList();
-        return new ChatIaResponse(clienteIa.conversar(mensajes, solicitud.contexto()));
+        return new ChatIaResponse(agentes.conversar(mensajes, solicitud.contexto()));
     }
 
     @PostMapping("/images/edits")
